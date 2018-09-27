@@ -88,8 +88,8 @@ return [
         '7z' => 'application/x-7z-compressed'
     ],
     "error-page"=>[
-        "404"=>"404.html",
-        "500"=>"500.html",
-        "503"=>"503.html"
+        "404"=>"/../error-pages/404.html",
+        "500"=>"/../error-pages/500.html",
+        "503"=>"/../error-pages/503.html"
     ]
 ];
