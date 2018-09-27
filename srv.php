@@ -11,7 +11,7 @@ class srv
         include "srv/execute.php";
         include "srv/socket.php";
         include $this->__conf["start"]["dir"].$this->__conf["start"]["file"];
-        var_dump(stream_get_transports());
+        print "[ INFO ] Starting web server...".PHP_EOL;
         $status = true;
         while($status){
             $this->socket();

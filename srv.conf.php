@@ -3,9 +3,9 @@ return [
     "pid"=>"server.pid",
     "host"=>"0.0.0.0",
     "port"=>8000,
-    "protocol"=>"tls",
+    "protocol"=>"tcp",
     "start"=>[
-        "dir"=>"/usr/local/www/webadmin",
+        "dir"=>"./data",
         "file"=>"/index.php",
         "class"=>"index",
         "method"=>"init"

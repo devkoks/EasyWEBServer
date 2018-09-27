@@ -48,15 +48,18 @@ class socket
     public function server()
     {
         try{
+            print "[ INFO ] Open socket...".PHP_EOL;
             $socket = $this->openServerSocket();
+            print "[ OK ] Web server started!".PHP_EOL;
         }catch(Exception $e){
+            print "[ FAIL ] Web server not started!".PHP_EOL;
             exit($e);
         }
         while ($connection = stream_socket_accept($socket,-1)) {
             $content = "";
             $client = "";
             try{
-                usleep(1000);
+                //usleep(1000);
                 stream_set_blocking($connection,false);
                 $client = stream_get_contents($connection);
                 //var_dump($client);
@@ -94,6 +97,7 @@ class socket
             fclose($connection);
         }
         fclose($socket);
+        print "[ FAIL ] Socket closed!".PHP_EOL;
     }
 
     private function send($connection,$data)
@@ -116,7 +120,6 @@ class socket
         switch($this->__protocol){
             case "tcp":
                 $socket = stream_socket_server("{$this->__protocol}://{$this->__host}:{$this->__port}", $errno, $errstr);
-
             break;
             case "tls":
                 $context = stream_context_create([
@@ -131,10 +134,9 @@ class socket
             default:
                 $socket = false;
         }
-
         if(!$socket)
             throw new Exception("Error starting server[{$errno}]: {$errstr}");
-
+        print "[ OK ] Listening on {$this->__protocol}://{$this->__host}:{$this->__port}".PHP_EOL;
         return $socket;
     }
 
