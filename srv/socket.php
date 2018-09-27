@@ -59,26 +59,8 @@ class socket
             $content = "";
             $client = "";
             try{
-                //usleep(1000);
                 stream_set_blocking($connection,false);
-                $client = stream_get_contents($connection);
-                //var_dump($client);
-                /*if($client === false){
-                    throw new Exception("Error accepting connection");
-                    continue;
-                }*/
-
-                /*while (!feof($connection)) {
-                    $client .= fread($connection, 8192);
-                }*/
-                /*while ($buffer = fgets($connection, 1024) and strlen($buffer) !== 2) {
-                    print $buffer . strlen($buffer);
-                    $client .= $buffer;
-                }*/
-                //stream_set_blocking($connection,false);
-                /*if (!feof($connection)) {
-                    print "Error: unexpected fgets() fail\n";
-                }*/
+                while($client == "") $client = stream_get_contents($connection);
                 $ip = stream_socket_get_name($connection,true);
                 $ip = explode(":",$ip);
                 $ip = $ip[0];
