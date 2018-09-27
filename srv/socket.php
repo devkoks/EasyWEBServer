@@ -8,6 +8,7 @@ class socket
     private $__tls_cert = "";
 
     private $__chunk    = 8194;
+    private $__timeout  = 10000000;
 
     private $context;
 
@@ -60,7 +61,12 @@ class socket
             $client = "";
             try{
                 stream_set_blocking($connection,false);
-                while($client == "") $client = stream_get_contents($connection);
+                $i=0;
+                while($client == ""){
+                     $client = stream_get_contents($connection);
+                     if($i==$this->__timeout) break;
+                     $i++;
+                }
                 $ip = stream_socket_get_name($connection,true);
                 $ip = explode(":",$ip);
                 $ip = $ip[0];
@@ -86,10 +92,19 @@ class socket
     {
         if($data!=""){
             $totalSent = 0;
+            $i=0;
+            $oldChunk = 0;
             do{
                 $Chunk = substr($data,$totalSent,$this->__chunk);
                 $sent = fwrite($connection, $Chunk, $this->__chunk);
                 $totalSent += $sent;
+                if($totalSent == $oldChunk){
+                    $i++;
+                }else{
+                    $oldChunk = $totalSent;
+                    $i=0;
+                }
+                if($i==$this->__timeout) break;
             } while ($totalSent < strlen($data));
         }else{
             fwrite($connection, " ");

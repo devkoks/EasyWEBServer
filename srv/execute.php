@@ -28,9 +28,9 @@ class execute
             $this->header("Content-type: text/html");
         }else{
             $dir = $this->conf["start"]["dir"].$this->__url;
-            /*if(!file_exists($this->__url)){
+            if(!file_exists($dir)){
                 $dir = $this->conf["start"]["dir"].$this->conf["error-page"]["404"];
-            }*/
+            }
             $this->header("Content-type: ".$this->select());
             $f=fopen($dir,"r");
             while ($buffer = fgets($f, 1024)) {
@@ -217,7 +217,7 @@ class execute
 
     public function error($httpCode,$content)
     {
-        
+
     }
 
 }
