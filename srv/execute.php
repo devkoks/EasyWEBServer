@@ -197,18 +197,21 @@ class execute
         if(!isset($type[1])) return [];
 
         //Parsing boundary name
-        preg_match('/boundary\=\"(.*?)\"/',$type[1],$boundary);
+        preg_match('/boundary\=(.*)/',$type[1],$boundary);
         $boundary = $boundary[1];
 
-        $array = explode("--".$boundary.PHP_EOL,$content);
+        $content = str_replace("--".$boundary."--","",$content);
+
+        $array = explode("--".$boundary."\r\n",$content);
         $parts = [];
         foreach($array as $arr){
             if(empty($arr)) continue;
             $headers=[];
-            $heads = explode(PHP_EOL.PHP_EOL,$arr);
+            $heads = explode("\r\n\r\n",$arr);
             $body = $heads[1];
             $heads = explode(PHP_EOL,$heads[0]);
             foreach($heads as $head){
+                $head = trim($head);
                 $header = explode(":",$head);
                 foreach($header as $heade){
                     $h = explode(";",$heade);
