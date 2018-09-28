@@ -3,7 +3,7 @@ return [
     "pid"=>"server.pid",
     "host"=>"0.0.0.0",
     "port"=>8000,
-    "protocol"=>"tcp",
+    "protocol"=>"tls",
     "start"=>[
         "dir"=>"./data",
         "file"=>"/index.php",
@@ -14,7 +14,7 @@ return [
     "max-timeout-connections"=>1,
     "time-to-restart"=>[30,300],
     "count-to-next-level"=>3,
-    "certificate"=>"/usr/local/www/webadmin/CA/web.pem",
+    "certificate"=>"/usr/local/web/crt/web.pem",
     "mime-types"=>[
         '*' => 'application/x-httpd-php',
         'aac' => 'audio/aac',

@@ -98,7 +98,9 @@ class execute
     private function parseUrlQuery($url)
     {
         $GET = urldecode(parse_url($url,PHP_URL_QUERY));
-        parse_str($GET,$GET_PARSED);
+        if(empty($GET)){
+            parse_str($url,$GET_PARSED);
+        }
         return $GET_PARSED;
     }
     private function post()
@@ -162,7 +164,14 @@ class execute
 
     private function parseClientContent()
     {
-        $content = explode(PHP_EOL.PHP_EOL,$this->__client["content"]);
+        $content = explode("\r\n\r\n",$this->__client["content"]);
+
+        $h=$content[0];
+        unset($content[0]);
+
+        $content[1] = implode("\r\n\r\n",$content);
+        $content[0] = $h;
+
         if(isset($content[0])){
             $headers = $content[0];
             $headers = explode(PHP_EOL,$headers);
