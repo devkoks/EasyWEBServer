@@ -209,7 +209,7 @@ class execute
             $headers=[];
             $heads = explode("\r\n\r\n",$arr);
             $body = $heads[1];
-            $heads = explode(PHP_EOL,$heads[0]);
+            $heads = explode("\r\n",$heads[0]);
             foreach($heads as $head){
                 $head = trim($head);
                 $header = explode(":",$head);

@@ -8,7 +8,7 @@ class socket
     private $__tls_cert = "";
 
     private $__chunk    = 8194;
-    private $__timeout  = 100000;
+    private $__timeout  = 1000000000;
 
     private $context;
 
@@ -95,6 +95,7 @@ class socket
         if($data!=""){
             $totalSent = 0;
             $i=0;
+            $time=time();
             $oldChunk = 0;
             do{
                 $Chunk = substr($data,$totalSent,$this->__chunk);
@@ -105,8 +106,9 @@ class socket
                 }else{
                     $oldChunk = $totalSent;
                     $i=0;
+                    $time=time();
                 }
-                if($i==$this->__timeout) break;
+                if($i==$this->__timeout or $time+10<time()) break;
             } while ($totalSent < strlen($data));
         }else{
             @fwrite($connection, " ");
