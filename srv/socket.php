@@ -8,7 +8,9 @@ class socket
     private $__tls_cert = "";
 
     private $__chunk    = 8194;
-    private $__timeout  = 1000000000;
+    private $__timeout  = 10000;
+
+    public $run         = true;
 
     private $context;
 
@@ -56,7 +58,9 @@ class socket
             print "[ FAIL ] Web server not started!".PHP_EOL;
             exit($e);
         }
-        while ($connection = stream_socket_accept($socket,-1)) {
+        while ($this->run) {
+            $connection = @stream_socket_accept($socket,0);
+            if(!$connection) continue;
             $content = "";
             $client = "";
             try{
