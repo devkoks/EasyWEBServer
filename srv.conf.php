@@ -2,10 +2,11 @@
 return [
     "pid"=>"server.pid",
     "host"=>"0.0.0.0",
-    "port"=>8000,
+    "port"=>8999,
     "protocol"=>"tls",
+    "threads"=>3,
     "start"=>[
-        "dir"=>"./data",
+        "dir"=>"./Fantasy-CORE", // ./data
         "file"=>"/index.php",
         "class"=>"index",
         "method"=>"init"
