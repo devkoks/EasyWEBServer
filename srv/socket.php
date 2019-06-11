@@ -128,7 +128,7 @@ class socket
     public function handshake($connection)
     {
         $tls = new tls();
-        $tls->clientHello($connection);
+        $tls->handshake($connection);
         /*$message = $this->recv($connection);
         $hex = strtoupper(implode("",str_split(bin2hex($message), 2)));
         var_dump($hex);
@@ -188,7 +188,7 @@ class socket
     {
         //socket_write($connection, " ");
         //stream_set_blocking($connection,true);
-        /*if($data!=""){
+        if($data!=""){
             $totalSent = 0;
             $i=0;
             $time=time();
@@ -210,7 +210,7 @@ class socket
         }else{
             //@fwrite($connection, " ");
             socket_write($connection, " ");
-        }*/
+        }
         //stream_set_blocking($connection,false);
     }
 
@@ -235,15 +235,6 @@ class socket
                 ]);
                 $this->socket = socket_create(AF_INET, SOCK_STREAM, 6);
                 socket_set_option($this->socket, SOL_SOCKET, SO_REUSEADDR, 1);
-
-                /*socket_set_option($this->socket, SOL_SOCKET, 'ssl', [
-                    "local_cert"=>$this->__tls_cert,
-                    "allow_self_signed"=>true,
-                    "verify_peer"=>false
-                ]);*/
-                socket_set_option($this->socket, 'ssl', 'local_cert', $this->__tls_cert);
-                /*socket_set_option($this->socket, SOL_SOCKET, 'ssl', 'allow_self_signed', true);
-                socket_set_option($this->socket, SOL_SOCKET, 'ssl', 'verify_peer', false);*/
                 socket_bind($this->socket, $this->__host, $this->__port);
                 socket_listen($this->socket, 10);
             break;
