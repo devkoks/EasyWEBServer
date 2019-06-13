@@ -97,18 +97,15 @@ class socket
                 $client = "";
                 try{
                     if($this->__protocol=='tls'){
-                        $this->handshake($connection);
-                        //$client = $this->recv($connection);
-                        //socket_getpeername($connection,$ip);
-                        //$execute = new execute($this->context,$client,$ip);
-                        //$content = $execute->getReturn();
-                        //$content = hex2bin("15030100020228");
+                        $tls = new tls();
+                        $tls->handshake($connection);
+                        $client = $tls->recv($connection);
                     }else{
                         $client = $this->recv($connection);
-                        socket_getpeername($connection,$ip);
-                        $execute = new execute($this->context,$client,$ip);
-                        $content = $execute->getReturn();
                     }
+                    socket_getpeername($connection,$ip);
+                    $execute = new execute($this->context,$client,$ip);
+                    $content = $execute->getReturn();
                 }catch(Exception $e){
                     print "Error: ".$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine();
                     print PHP_EOL;
@@ -118,48 +115,15 @@ class socket
                     print PHP_EOL;
                     print $e->getTraceAsString();
                 }
-                $this->send($connection,$content);
+                if($this->__protocol=='tls'){
+                    $tls->send($connection,$content);
+                }else{
+                    $this->send($connection,$content);
+                }
                 socket_close($connection);
             }
             exit();
         }
-    }
-
-    public function handshake($connection)
-    {
-        $tls = new tls();
-        $tls->handshake($connection);
-        /*$message = $this->recv($connection);
-        $hex = strtoupper(implode("",str_split(bin2hex($message), 2)));
-        var_dump($hex);
-        $byteArray = unpack("C*",$message);//C*
-        $tls = new tls();
-
-        var_dump($byteArray[1]==0x16,"Handshake record");
-        $tls->clientHello($message);
-        $tls->setProtocol($tls->getProtocol($byteArray[3]));
-        switch($tls->getProtocol()){
-            case $tls::PROTOCOL_SSLv3:
-                print "Connection protocol: SSLv3";
-            break;
-            case $tls::PROTOCOL_TLS10:
-                print "Connection protocol: TLS1.0";
-            break;
-            case $tls::PROTOCOL_TLS11:
-                print "Connection protocol: TLS1.1";
-            break;
-            case $tls::PROTOCOL_TLS12:
-                print "Connection protocol: TLS1.2/1.3";
-            break;
-        }
-        print PHP_EOL;
-        var_dump(hexdec(unpack("H4",$message,3)[1]),"Bytes of handshake"); //bytes of handshake message follows
-        var_dump($byteArray[6]==0x01,"Client hello");//handshake message type 0x01 (client hello)
-        var_dump($byteArray[7],$byteArray[8],$byteArray[9]); //bytes of client hello follows
-        //var_dump($byteArray[10]==0x03&&$byteArray[11]==0x03,"CLIENT VERSION");
-        //var_dump($byteArray[12]==0x03&&$byteArray[44]==0x03,"Client random");//Client random
-        var_dump($byteArray[45]==0x00,"Session ID");*/
-
     }
 
     private function recv($connection)

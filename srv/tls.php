@@ -57,6 +57,73 @@ class tls
         $this->clientChangeCipherSpec($connection);
         $this->clientHelloDoneHandshake($connection);
         $this->serverHandshakeFinished($connection);
+        //$msgs=[];
+        //foreach($this->messages as $msg){$msgs[]=bin2hex($msg);}
+        //var_dump(implode("",$msgs));
+    }
+    public function recv($connection)
+    {
+        $decrypted="";
+        socket_recv($connection, $recordHeader, 5, MSG_WAITALL);
+        if(unpack("C",$recordHeader)[1]!=0x17) return false;
+        $record = [];
+        $record['version'] = $this->getProtocol(hexdec(unpack("H4",$recordHeader,1)[1]));
+        $record['length'] = hexdec(unpack("H4",$recordHeader,3)[1]);
+        //var_dump($record['length']);
+        $ivLenght = openssl_cipher_iv_length("aes-128-cbc");
+        socket_recv($connection, $recordIV, $ivLenght, MSG_WAITALL);
+
+        //$ivLenght
+
+        socket_recv($connection, $recordEncryptedData, $record['length']-$ivLenght, MSG_WAITALL);
+        $decrypted = openssl_decrypt($recordEncryptedData,"aes-128-cbc",$this->client['write-key'],OPENSSL_RAW_DATA,$recordIV);
+        //var_dump(substr($decrypted,0,$record['length']-52));4
+        /*var_dump(substr($decrypted, 0, -35));
+        var_dump(bin2hex($decrypted));
+                $seq = "0000000000000001";
+                $rechd = "170303";
+                $datalen = "0004";
+                $data = substr($decrypted, 0, 4);
+        $mac_key = hash_hmac("sha256", hex2bin($seq.$rechd.$datalen).$data, $this->client['mac-key'], true);
+        var_dump(bin2hex($mac_key));*/
+        //var_dump(bin2hex(substr($decrypted,$record['length']-52,$record['length'])));
+        return $decrypted;
+    }
+    public function send($connection,$content)
+    {
+        $package = "";
+
+        $ivLenght = openssl_cipher_iv_length("aes-128-cbc");
+        $encryptionIV = openssl_random_pseudo_bytes($ivLenght);
+
+
+
+        $seq = "0000000000000001";
+        $rechd = "160303";
+        $len = unpack("H*",pack("@2N",strlen($content)))[1];
+        $datalen = hex2bin(
+            $len[strlen($len)-4].$len[strlen($len)-3].
+            $len[strlen($len)-2].$len[strlen($len)-1]);
+
+        $mac_key = hash_hmac("sha256", hex2bin($seq.$rechd).$datalen.$content, $this->server['mac-key'], true);
+        $encrypt = openssl_encrypt($content.$mac_key.hex2bin("0f"),"aes-128-cbc",$this->server['write-key'], OPENSSL_RAW_DATA, $encryptionIV);
+
+        $package .= $encrypt.$package;
+
+        $len = unpack("H*",pack("@2N",strlen($package)))[1];
+        var_dump(strlen($package),$len);
+        $package = hex2bin(
+            $len[strlen($len)-4].$len[strlen($len)-3].
+            $len[strlen($len)-2].$len[strlen($len)-1]
+            ).$package;
+
+
+
+        $package .= pack("C*",0x17,0x03,0x03).$package;
+
+
+
+        socket_write($connection,$package);
     }
     public function clientHello($connection)
     {
@@ -282,8 +349,8 @@ class tls
 
     private function serverHelloDoneHandshake($connection)
     {
-        $this->messages[] = pack("C*",0x16,0x03,0x03,0x00,0x04,0x0e,0x00,0x00,0x00);
-        return pack("C*",0x16,0x03,0x03,0x00,0x04,0x0e,0x00,0x00,0x00);
+        $this->messages[] = pack("C*",0x0e,0x00,0x00,0x00);
+        return pack("C*",0x16,0x03,0x03,0x00,0x04,0x0e,0x00,0x00,0x00, 0x14, 0x03, 0x03, 0x00, 0x01, 0x01);
     }
 
     private function clientKeyExchange($connection)
@@ -306,14 +373,16 @@ class tls
     private function clientChangeCipherSpec($connection)
     {
         socket_recv($connection, $recordHeader, 6, MSG_WAITALL);
-        if(unpack("C",$recordHeader)[1]!=0x16) return false;
-        $this->messages[] = pack("C",0x01);
+        // $this->messages[] = $recordHeader;
+        //if(unpack("C",$recordHeader)[1]!=0x16) return false;
+        //$this->messages[] = pack("C",0x01);
     }
     private function clientHelloDoneHandshake($connection)
     {
         $record = [];
         socket_recv($connection, $recordHeader, 5, MSG_WAITALL);
         if(unpack("C",$recordHeader)[1]!=0x16) return false;
+        echo "client_enc_len:".unpack("H4",$recordHeader,3)[1].PHP_EOL.PHP_EOL;
         $record['length'] = hexdec(unpack("H4",$recordHeader,3)[1]);
 
         $ivLenght = openssl_cipher_iv_length("aes-128-cbc");
@@ -321,16 +390,29 @@ class tls
         socket_recv($connection, $recordIV, $ivLenght, MSG_WAITALL);
 
         $this->client['iv'] = $recordIV;
-        $this->messages[] = $recordIV;
+        // var_dump(bin2hex($this->client['iv']), "____IV");
+        // $this->messages[] = $recordIV;
 
         socket_recv($connection, $recordEncryptedData, $record['length']-$ivLenght, MSG_WAITALL);
-        $this->messages[] = $recordEncryptedData;
-
-        //var_dump(bin2hex($recordEncryptedData));
+        // $this->messages[] = $recordEncryptedData;
         $decrypted = "";
         $this->generateMasterSecret();
         $this->generateEncryptionKeys($this->server['MasterSecret'], $this->client['random'], $this->server['random']);
-        //var_dump(bin2hex(openssl_decrypt($recordEncryptedData,"aes-128-cbc",$this->client['write-key'],OPENSSL_RAW_DATA,$this->client['iv'])));
+        $decrypted = openssl_decrypt($recordEncryptedData,"aes-128-cbc",$this->client['write-key'],OPENSSL_RAW_DATA,$this->client['iv']);
+
+        $this->messages[] = substr($decrypted, 0, 16);
+        echo "client_iv:".bin2hex($this->client['iv-key']).PHP_EOL.PHP_EOL;
+        echo "client_enc_iv:".bin2hex($recordIV).PHP_EOL.PHP_EOL;
+        echo "client_encrypted:".bin2hex($recordEncryptedData).PHP_EOL.PHP_EOL;
+        echo "client_decrypted:".bin2hex($decrypted).PHP_EOL.PHP_EOL;
+        echo "client_mac_key_dec:".bin2hex(substr($decrypted, 16)).PHP_EOL.PHP_EOL;
+        echo "client_mac:".bin2hex($this->client['mac-key']).PHP_EOL.PHP_EOL;
+        $seq = "0000000000000000";
+        $rechd = "160303";
+        $datalen = "0010";
+        $client_mac = hash_hmac("sha256", hex2bin($seq.$rechd.$datalen).substr($decrypted, 0, 16), $this->client['mac-key'], true);
+        echo "client_mac_key:".bin2hex($client_mac).PHP_EOL.PHP_EOL;
+        // $this->messages[] = $client_mac;
         //var_dump($decrypted);
     }
 
@@ -350,11 +432,14 @@ class tls
     }
     private function generateEncryptionKeys($master_secret, $client_random, $server_random) {
         // TLS_RSA_WITH_RC4_128_SHA has 20byte mac + 16byte key means 72 bytes of data is needed
-        $key_buffer = $this->prf_tls12($master_secret, "key expansion", $server_random.$client_random, 96);
+        $key_buffer = $this->prf_tls12($master_secret, "key expansion", $server_random.$client_random, 128);
         $this->client['mac-key'] = substr($key_buffer, 0, 32);
         $this->server['mac-key'] = substr($key_buffer, 32, 32);
         $this->client['write-key'] = substr($key_buffer, 64, 16);
         $this->server['write-key'] = substr($key_buffer, 80, 16);
+        $this->client['iv-key'] = substr($key_buffer, 96, 16);
+        $this->server['iv-key'] = substr($key_buffer, 112, 16);
+        // var_dump(bin2hex($this->client['mac-key']),bin2hex($this->server['mac-key']),bin2hex($this->client['write-key']),bin2hex($this->server['write-key']), bin2hex($this->client['iv']), bin2hex($this->server['iv']));
     }
     protected function prf_tls12($secret, $label, $seed, $size = 48) {
         return $this->p_hash("sha256", $secret, $label . $seed, $size);
@@ -365,14 +450,12 @@ class tls
         $package = "";
 
         $decrypted = "";
-
-
+        //echo "handshake_msg_hash:".bin2hex(hash("sha256",implode("",$this->messages),true)).PHP_EOL.PHP_EOL;
         $a0=$seed = "server finished".hash("sha256",implode("",$this->messages),true);
         $a1 = hash_hmac("sha256",$a0,$this->server['MasterSecret'],true);
-        $p1 = hash_hmac("sha256",$a1,$this->server['MasterSecret'].$seed,true);
+        $p1 = hash_hmac("sha256",$a1.$seed,$this->server['MasterSecret'],true);
 
         $decrypted = substr($p1, 0, 12).$decrypted;
-        var_dump(bin2hex($decrypted));
 
         $len = unpack("H*",pack("@3N",strlen($decrypted)))[1];
         $decrypted = hex2bin(
@@ -385,17 +468,33 @@ class tls
 
         $ivLenght = openssl_cipher_iv_length("aes-128-cbc");
         $encryptionIV = openssl_random_pseudo_bytes($ivLenght);
-        $encrypt = openssl_encrypt($decrypted,"aes-128-cbc",$this->server['write-key'],OPENSSL_RAW_DATA,$encryptionIV);
+
+        $seq = "0000000000000000";
+        $rechd = "160303";
+        $len = unpack("H*",pack("@2N",strlen($decrypted)))[1];
+        $datalen = hex2bin(
+            $len[strlen($len)-4].$len[strlen($len)-3].
+            $len[strlen($len)-2].$len[strlen($len)-1]);
+        //echo "DATAlen:".bin2hex($datalen).PHP_EOL.PHP_EOL;
+        //echo "decrypted:".bin2hex($decrypted).PHP_EOL.PHP_EOL;
+
+        echo "encryptionIV:".bin2hex($this->server['iv-key']).PHP_EOL.PHP_EOL;
+        $mac_key = hash_hmac("sha256", hex2bin($seq.$rechd).$datalen.$decrypted, $this->server['mac-key'], true);
+        echo "mac_key:".bin2hex($mac_key).PHP_EOL.PHP_EOL;
+        $encrypt = openssl_encrypt($decrypted.$mac_key.hex2bin("0f"),"aes-128-cbc",$this->server['write-key'], OPENSSL_RAW_DATA, $encryptionIV);
+        echo "server_encrypted:".bin2hex($encrypt).PHP_EOL.PHP_EOL;
+
+        echo "server_decrypted:".bin2hex(openssl_decrypt($encrypt,"aes-128-cbc",$this->server['write-key'],OPENSSL_RAW_DATA,$encryptionIV)).PHP_EOL.PHP_EOL;
 
         $package = $encrypt.$package;
-        $package = $encryptionIV.$package;
+        $package =  $encryptionIV.$package;
         $len = unpack("H*",pack("@2N",strlen($package)))[1];
         $package = hex2bin(
             $len[strlen($len)-4].$len[strlen($len)-3].
             $len[strlen($len)-2].$len[strlen($len)-1]
             ).$package;
         $package = pack("C*",0x16,0x03,0x03).$package;
-        var_dump(bin2hex($package));
+        //var_dump(bin2hex($package));
         socket_write($connection,$package);
     }
 
