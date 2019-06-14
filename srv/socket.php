@@ -52,6 +52,15 @@ class socket
 
     public function start()
     {
+        $proto = __DIR__."/protocols/".$this->__protocol."/".$this->__protocol.".php";
+        if(file_exists($proto)){
+            require_once $proto;
+        }else{
+            throw new \Exception("Protocol not suppored", 2);
+        }
+        if(class_exists($this->__protocol,false))
+            $this->engine = new $this->__protocol();
+
         $this->server();
     }
     public function stop()
@@ -96,13 +105,7 @@ class socket
                 $content = "";
                 $client = "";
                 try{
-                    if($this->__protocol=='tls'){
-                        $tls = new tls();
-                        $tls->handshake($connection);
-                        $client = $tls->recv($connection);
-                    }else{
-                        $client = $this->recv($connection);
-                    }
+                    $client = $this->engine->recv($connection,$content);
                     socket_getpeername($connection,$ip);
                     $execute = new execute($this->context,$client,$ip);
                     $content = $execute->getReturn();
@@ -115,98 +118,18 @@ class socket
                     print PHP_EOL;
                     print $e->getTraceAsString();
                 }
-                if($this->__protocol=='tls'){
-                    $tls->send($connection,$content);
-                }else{
-                    $this->send($connection,$content);
-                }
+                $this->engine->send($connection,$content);
                 socket_close($connection);
             }
             exit();
         }
     }
 
-    private function recv($connection)
-    {
-        socket_set_option($connection, SOL_SOCKET, SO_RCVTIMEO, ['sec'=>$this->__timeout,'usec'=>0]);
-        $response = "";
-        $done = false;
-        while(!$done) {
-            socket_clear_error($connection);
-            $bytes = socket_recv($connection, $r_data, $this->__chunk, MSG_WAITALL);
-            $lastError = socket_last_error($connection);
-            if($lastError==35){
-                $done = true;
-            }elseif ($bytes === false) {
-                $done = true;
-            } elseif (intval($bytes) > 0) {
-                $response .= $r_data;
-            } else {
-                $done = true;
-            }
-        }
-        return $response;
-    }
-
-    private function send($connection,$data)
-    {
-        //socket_write($connection, " ");
-        //stream_set_blocking($connection,true);
-        if($data!=""){
-            $totalSent = 0;
-            $i=0;
-            $time=time();
-            $oldChunk = 0;
-            do{
-                $Chunk = substr($data,$totalSent,$this->__chunk);
-                //$sent = @fwrite($connection, $Chunk, $this->__chunk);
-                $sent = socket_write($connection, $Chunk, $this->__chunk);
-                $totalSent += $sent;
-                if($totalSent == $oldChunk){
-                    $i++;
-                }else{
-                    $oldChunk = $totalSent;
-                    $i=0;
-                    $time=time();
-                }
-                //if($i==$this->__timeout or $time+10<time()) break;
-            } while ($totalSent < strlen($data));
-        }else{
-            //@fwrite($connection, " ");
-            socket_write($connection, " ");
-        }
-        //stream_set_blocking($connection,false);
-    }
-
     private function openServerSocket()
     {
-        //$socket = false;
-        switch($this->__protocol){
-            case "tcp":
-                $this->socket = socket_create(AF_INET, SOCK_STREAM, 6);
-                socket_set_option($this->socket, SOL_SOCKET, SO_REUSEADDR, 1);
-                socket_bind($this->socket, $this->__host, $this->__port);
-                socket_listen($this->socket, 10);
-                //socket_set_nonblock($this->socket);
-            break;
-            case "tls":
-                $context = stream_context_create([
-                    "ssl"=>[
-                        "local_cert"=>$this->__tls_cert,
-                        "allow_self_signed"=>true,
-                        "verify_peer"=>false
-                    ]
-                ]);
-                $this->socket = socket_create(AF_INET, SOCK_STREAM, 6);
-                socket_set_option($this->socket, SOL_SOCKET, SO_REUSEADDR, 1);
-                socket_bind($this->socket, $this->__host, $this->__port);
-                socket_listen($this->socket, 10);
-            break;
-            default:
-                $socket = false;
-        }
-        //if(!$this->socket)
-        //    throw new Exception("Error starting server[{$errno}]: {$errstr}");
+        $this->socket = $this->engine->open($this->__host,$this->__port);
+        if(!$this->socket)
+            throw new Exception("Error starting server[{$errno}]: {$errstr}");
         print "[ OK ] Listening on {$this->__protocol}://{$this->__host}:{$this->__port}".PHP_EOL;
         return $this->socket;
     }

@@ -1,12 +1,8 @@
 <?php
-class tls
+namespace srv\tls\tls12;
+
+class Handshake
 {
-
-    const PROTOCOL_SSLv3 = 0x0300;
-    const PROTOCOL_TLS10 = 0x0301;
-    const PROTOCOL_TLS11 = 0x0302;
-    const PROTOCOL_TLS12 = 0x0303;
-
     const TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256   = 0xCCA8;
     const TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 = 0xCCA9;
     const TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256         = 0xC02F;
@@ -24,42 +20,20 @@ class tls
     const TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA           = 0xC012;
     const TLS_RSA_WITH_3DES_EDE_CBC_SHA                 = 0x000A;
 
-    private $protocol_version = 0;
-    private $chipher_suite = 0;
+    private $connection;
     private $client;
     private $server;
     private $messages = [];
 
-    public function getProtocol($byte=null)
-    {
-        if($byte==null) return $this->protocol_version;
-        switch($byte){
-            case self::PROTOCOL_SSLv3:
-                return self::PROTOCOL_SSLv3;
-            case self::PROTOCOL_TLS10:
-                return self::PROTOCOL_TLS10;
-            case self::PROTOCOL_TLS11:
-                return self::PROTOCOL_TLS11;
-            case self::PROTOCOL_TLS12:
-                return self::PROTOCOL_TLS12;
-        }
-    }
-    public function setProtocol($protocol)
-    {
-        $this->protocol_version = $protocol;
-    }
-
     public function handshake($connection)
     {
+        $this->connection = $connection;
         $this->clientHello($connection);
         $this->serverHello($connection);
         $this->clientKeyExchange($connection);
         $this->clientChangeCipherSpec($connection);
         $this->clientHelloDoneHandshake($connection);
         $this->serverHandshakeFinished($connection);
-        //$msgs=[];
-        //foreach($this->messages as $msg){$msgs[]=bin2hex($msg);}
-        //var_dump(implode("",$msgs));
     }
     public function recv($connection)
     {
@@ -67,7 +41,7 @@ class tls
         socket_recv($connection, $recordHeader, 5, MSG_WAITALL);
         if(unpack("C",$recordHeader)[1]!=0x17) return false;
         $record = [];
-        $record['version'] = $this->getProtocol(hexdec(unpack("H4",$recordHeader,1)[1]));
+        $record['version'] = 0x0303;
         $record['length'] = hexdec(unpack("H4",$recordHeader,3)[1]);
         //var_dump($record['length']);
         $ivLenght = openssl_cipher_iv_length("aes-128-cbc");
@@ -91,14 +65,9 @@ class tls
     }
     public function send($connection,$content)
     {
-        //$content = "GAGAGAGAGAGAGAGAGAGAGAGAGAGAGGA";
         $package = "";
-
         $ivLenght = openssl_cipher_iv_length("aes-128-cbc");
         $encryptionIV = openssl_random_pseudo_bytes($ivLenght);
-
-
-
         $seq = "0000000000000001";
         $rechd = "170303";
         $len = unpack("H*",pack("@2N",strlen($content)))[1];
@@ -111,19 +80,13 @@ class tls
 
         $package = $encrypt.$package;
         $package = $encryptionIV.$package;
-
         $len = unpack("H*",pack("@2N",strlen($package)))[1];
         $package = hex2bin(
             $len[strlen($len)-4].$len[strlen($len)-3].
             $len[strlen($len)-2].$len[strlen($len)-1]
             ).$package;
 
-
-
         $package = pack("C*",0x17,0x03,0x03).$package;
-
-        var_dump(bin2hex($package));
-
         socket_write($connection,$package);
     }
     public function clientHello($connection)
@@ -146,7 +109,7 @@ class tls
         socket_recv($connection, $recordHeader, 5, MSG_WAITALL);
         if(unpack("C",$recordHeader)[1]!=0x16) return false;
         $record = [];
-        $record['version'] = $this->getProtocol(hexdec(unpack("H4",$recordHeader,1)[1]));
+        $record['version'] = 0x0303;
         $record['length'] = hexdec(unpack("H4",$recordHeader,3)[1]);
         return $record;
     }
@@ -158,7 +121,7 @@ class tls
         $handshake['length'] = hexdec(unpack("H6",$handshakeHeader,1)[1]);
         $this->messages[] = $handshakeHeader;
         socket_recv($connection, $handshakeVersion, 2, MSG_WAITALL);
-        $handshake['version'] = $this->getProtocol(hexdec(unpack("H4",$handshakeVersion)[1]));
+        $handshake['version'] = 0x0303;
         $this->messages[] = $handshakeVersion;
         socket_recv($connection, $handshakeRandom, 32, MSG_WAITALL);
         $handshake['random'] = $handshakeRandom;
@@ -205,71 +168,26 @@ class tls
         $package .= pack("C*",0xFF,0x01);
         $package .= pack("C*",0x00,0x01);
         $package .= pack("C*",0x00);
-
-
-        $len = unpack("H*",pack("@3N",strlen($package)))[1];
-        $package = hex2bin(
-            $len[strlen($len)-6].$len[strlen($len)-5].
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
+        $package = $this->getSize($package,3).$package;
         $package = pack("C*",0x02).$package;
 
         $this->messages[] = $package;
 
-        $len = unpack("H*",pack("@2N",strlen($package)))[1];
-        $package = hex2bin(
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
-        $package = pack("C*",0x03, 0x03).$package;
-        $package = pack("C*",0x16).$package;
-
+        $package = $this->handshakeRecord($package);
         return $package;
     }
     private function serverCertificateHandshake($connection,$client)
     {
         $package = "";
-
         $package = $this->pem2der(file_get_contents("/usr/local/web/crt/rootCA.crt")).$package;
-
-        $len = unpack("H*",pack("@3N",strlen($this->pem2der(file_get_contents("/usr/local/web/crt/rootCA.crt")))))[1];
-        $package = hex2bin(
-            $len[strlen($len)-6].$len[strlen($len)-5].
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
-
-
+        $package = $this->getSize($this->pem2der(file_get_contents("/usr/local/web/crt/rootCA.crt")),3).$package;
         $package = $this->pem2der(file_get_contents("/usr/local/web/crt/web.blue-creature.com.crt")).$package;
-
-        $len = unpack("H*",pack("@3N",strlen($this->pem2der(file_get_contents("/usr/local/web/crt/web.blue-creature.com.crt")))))[1];
-        $package = hex2bin(
-            $len[strlen($len)-6].$len[strlen($len)-5].
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
-        $len = unpack("H*",pack("@3N",strlen($package)))[1];
-        $package = hex2bin(
-            $len[strlen($len)-6].$len[strlen($len)-5].
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
-        $len = unpack("H*",pack("@3N",strlen($package)))[1];
-        $package = hex2bin(
-            $len[strlen($len)-6].$len[strlen($len)-5].
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
+        $package = $this->getSize($this->pem2der(file_get_contents("/usr/local/web/crt/web.blue-creature.com.crt")),3).$package;
+        $package = $this->getSize($package,3).$package;
+        $package = $this->getSize($package,3).$package;
         $package = pack("C*",0x0b).$package;
         $this->messages[] = $package;
-        $len = unpack("H*",pack("@2N",strlen($package)))[1];
-        $package = hex2bin(
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
-        $package = pack("C*",0x03,0x03).$package;
-        $package = pack("C*",0x16).$package;
+        $package = $this->handshakeRecord($package);
         return $package;
     }
 
@@ -290,61 +208,23 @@ class tls
         $sign="";
 
         $signSTR = $key['dh']['pub_key'];
-        $len = unpack("H*",pack("@2N",strlen($key['dh']['pub_key'])))[1];
-        $signSTR = hex2bin(
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$signSTR;
-
+        $signSTR = $this->getSize($key['dh']['pub_key'],2).$signSTR;
         $signSTR = $key['dh']['g'].$signSTR;
-
-        $len = unpack("H*",pack("@2N",strlen($key['dh']['g'])))[1];
-        $signSTR = hex2bin(
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$signSTR;
-
+        $signSTR = $this->getSize($key['dh']['g'],2).$signSTR;
         $signSTR = $key['dh']['p'].$signSTR;
-
-        $len = unpack("H*",pack("@2N",strlen($key['dh']['p'])))[1];
-        $signSTR = hex2bin(
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$signSTR;
-
+        $signSTR = $this->getSize($key['dh']['p'],2).$signSTR;
 
         openssl_sign($this->client['random'].$this->server['random'].$signSTR, $sign, openssl_pkey_get_private(file_get_contents("/usr/local/web/crt/web.blue-creature.com.key")),"sha256WithRSAEncryption");
         $package = $sign;
-
-        $len = unpack("H*",pack("@2N",strlen($package)))[1];
-        $package = hex2bin(
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
-
-
+        $package = $this->getSize($package,2).$package;
         $package = pack("C*",0x04,0x01).$package;
-
         $package = $signSTR.$package;
-
-        $len = unpack("H*",pack("@3N",strlen($package)))[1];
-        $package = hex2bin(
-            $len[strlen($len)-6].$len[strlen($len)-5].
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
-
+        $package = $this->getSize($package,3).$package;
         $package = pack("C*",0x0c).$package;
 
         $this->messages[] = $package;
 
-        $len = unpack("H*",pack("@2N",strlen($package)))[1];
-        $package = hex2bin(
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
-        //$package = hex2bin("160303").$package;
-        $package = pack("C*",0x16,0x03,0x03).$package;
+        $package = $this->handshakeRecord($package);
         return $package;
     }
 
@@ -416,7 +296,6 @@ class tls
         $this->server['MasterSecret'] = $this->prf_tls12($this->server['PreMasterSecret'], "master secret", $this->client['random'].$this->server['random'], 48);
     }
     private function generateEncryptionKeys($master_secret, $client_random, $server_random) {
-        // TLS_RSA_WITH_RC4_128_SHA has 20byte mac + 16byte key means 72 bytes of data is needed
         $key_buffer = $this->prf_tls12($master_secret, "key expansion", $server_random.$client_random, 128);
         $this->client['mac-key'] = substr($key_buffer, 0, 32);
         $this->server['mac-key'] = substr($key_buffer, 32, 32);
@@ -424,7 +303,6 @@ class tls
         $this->server['write-key'] = substr($key_buffer, 80, 16);
         $this->client['iv-key'] = substr($key_buffer, 96, 16);
         $this->server['iv-key'] = substr($key_buffer, 112, 16);
-        // var_dump(bin2hex($this->client['mac-key']),bin2hex($this->server['mac-key']),bin2hex($this->client['write-key']),bin2hex($this->server['write-key']), bin2hex($this->client['iv']), bin2hex($this->server['iv']));
     }
     protected function prf_tls12($secret, $label, $seed, $size = 48) {
         return $this->p_hash("sha256", $secret, $label . $seed, $size);
@@ -433,22 +311,13 @@ class tls
     private function serverHandshakeFinished($connection)
     {
         $package = "";
-
         $decrypted = "";
-        //echo "handshake_msg_hash:".bin2hex(hash("sha256",implode("",$this->messages),true)).PHP_EOL.PHP_EOL;
         $a0=$seed = "server finished".hash("sha256",implode("",$this->messages),true);
         $a1 = hash_hmac("sha256",$a0,$this->server['MasterSecret'],true);
         $p1 = hash_hmac("sha256",$a1.$seed,$this->server['MasterSecret'],true);
 
         $decrypted = substr($p1, 0, 12).$decrypted;
-
-        $len = unpack("H*",pack("@3N",strlen($decrypted)))[1];
-        $decrypted = hex2bin(
-            $len[strlen($len)-6].$len[strlen($len)-5].
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$decrypted;
-
+        $decrypted = $this->getSize($decrypted,3).$decrypted;
         $decrypted = pack("C*",0x14).$decrypted;
 
         $ivLenght = openssl_cipher_iv_length("aes-128-cbc");
@@ -456,21 +325,12 @@ class tls
 
         $seq = "0000000000000000";
         $rechd = "160303";
-        $len = unpack("H*",pack("@2N",strlen($decrypted)))[1];
-        $datalen = hex2bin(
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]);
+        $datalen = $this->getSize($decrypted,2);
         $mac_key = hash_hmac("sha256", hex2bin($seq.$rechd).$datalen.$decrypted, $this->server['mac-key'], true);
         $encrypt = openssl_encrypt($decrypted.$mac_key.hex2bin("0f"),"aes-128-cbc",$this->server['write-key'], OPENSSL_RAW_DATA, $encryptionIV);
         $package = $encrypt.$package;
         $package =  $encryptionIV.$package;
-        $len = unpack("H*",pack("@2N",strlen($package)))[1];
-        $package = hex2bin(
-            $len[strlen($len)-4].$len[strlen($len)-3].
-            $len[strlen($len)-2].$len[strlen($len)-1]
-            ).$package;
-        $package = pack("C*",0x16,0x03,0x03).$package;
-        socket_write($connection,$package);
+        $package = $this->handshakeRecord($package,true);
     }
 
     private function pem2der($pem,$str="CERTIFICATE")
@@ -481,5 +341,23 @@ class tls
        $pem = substr($pem, 0, strpos($pem, $end));
        $der = base64_decode($pem);
        return $der;
+    }
+    private function handshakeRecord($record,$sent=false)
+    {
+        $package = pack("C*",0x16,0x03,0x03);
+        $package .= $this->getSize($record,2);
+        $package .= $record;
+        if($sent) socket_write($this->connection,$package);
+        return $package;
+    }
+    private function getSize($package,$bytes=2)
+    {
+        $len = unpack("H*",pack("@".$bytes."N",strlen($package)))[1];
+        $hex = "";
+        for($i=1;$i<=$bytes*2;$i++){
+            $hex = $len[strlen($len)-$i].$hex;
+        }
+        $size = hex2bin($hex);
+        return $size;
     }
 }

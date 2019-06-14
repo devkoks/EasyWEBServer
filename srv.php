@@ -16,8 +16,6 @@ class srv
     {
         $this->__conf = include "srv.conf.php";
         $this->__args = include "srv/arguments.php";
-        if($this->__conf['protocol'])
-            include "srv/tls.php";
         include "srv/execute.php";
         include "srv/socket.php";
         include $this->__conf["start"]["dir"].$this->__conf["start"]["file"];
