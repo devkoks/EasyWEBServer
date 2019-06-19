@@ -1,7 +1,7 @@
 <?php
-namespace srv\tls\tls12;
+namespace srv\protocol\tls\tls12;
 
-class Handshake
+class Handshake extends \TLS
 {
     const TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256   = 0xCCA8;
     const TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 = 0xCCA9;
@@ -24,6 +24,7 @@ class Handshake
     private $client;
     private $server;
     private $messages = [];
+    private $chiper;
 
     public function handshake($connection)
     {
@@ -75,8 +76,11 @@ class Handshake
             $len[strlen($len)-4].$len[strlen($len)-3].
             $len[strlen($len)-2].$len[strlen($len)-1]);
 
-        $mac_key = hash_hmac("sha256", hex2bin($seq.$rechd).$datalen.$content, $this->server['mac-key'], true);
-        $encrypt = openssl_encrypt($content.$mac_key.hex2bin("0b"),"aes-128-cbc",$this->server['write-key'], OPENSSL_RAW_DATA, $encryptionIV);
+        $mac_key = hash_hmac("sha1", hex2bin($seq.$rechd).$datalen.$content, $this->server['mac-key'], true);
+
+        $paddingLen = 16-(strlen($content.$mac_key) % 16)-1;
+
+        $encrypt = openssl_encrypt($content.$mac_key.pack("C*",$paddingLen),"aes-128-cbc",$this->server['write-key'], OPENSSL_RAW_DATA, $encryptionIV);
 
         $package = $encrypt.$package;
         $package = $encryptionIV.$package;
@@ -94,6 +98,7 @@ class Handshake
         $record = $this->clientHelloRecordHeader($connection);
         $handshake = $this->clientHelloHandshake($connection);
         $this->client = $handshake;
+        //require_once "/usr/local/web/srv/protocols/tls/chipers/T";
     }
     public function serverHello($connection)
     {
@@ -145,14 +150,18 @@ class Handshake
         $handshake['extensions-length'] = hexdec(unpack("H4",$handshakeExtensionsLength)[1]);
         $this->messages[] = $handshakeExtensionsLength;
         socket_recv($connection, $handshakeExtensions, $handshake['extensions-length'], MSG_WAITALL);
-        $handshake['extensions'] = unpack("H*",$handshakeExtensions)[1];
+        $handshake['extensions'] = $this->parseHandshakeExtensions($handshakeExtensions);
+
         $this->messages[] = $handshakeExtensions;
 
         return $handshake;
     }
     private function parseHandshakeExtensions($extensions)
     {
-
+        require_once "/usr/local/web/srv/protocols/tls/extensions.php";
+        $ext = new \srv\protocol\tls\Extensions($extensions);
+        //var_dump($ext->data);
+        return $ext->data;
     }
     private function serverHelloHandshake($connection,$client)
     {
@@ -160,14 +169,20 @@ class Handshake
         $this->server['random'] = openssl_random_pseudo_bytes(32);
         $package .= pack("C*",0x03, 0x03);
         $package .= $this->server['random'];
-        $package .= hex2bin($client['session-length']);
-        $package .= hex2bin($client['session']);
-        $package .= pack("C*",0x00,0x67);
         $package .= pack("C*",0x00);
-        $package .= pack("C*",0x00,0x05);
-        $package .= pack("C*",0xFF,0x01);
-        $package .= pack("C*",0x00,0x01);
+        /*$package .= hex2bin($client['session-length']);
+        $package .= hex2bin($client['session']);*/
+        $package .= pack("C*",0x00,0x33);
         $package .= pack("C*",0x00);
+        $extensions = "";
+        /*$extensions .= pack("C*",0x00,0x00);
+        $extensions .= pack("C*",0x00,0x00);*/
+        $extensions .= pack("C*",0xFF,0x01);
+        $extensions .= pack("C*",0x00,0x01);
+        $extensions .= pack("C*",0x00);
+        $package .= $this->getPackageSize($extensions,2);
+        $package .= $extensions;
+
         $package = $this->getSize($package,3).$package;
         $package = pack("C*",0x02).$package;
 
@@ -179,10 +194,10 @@ class Handshake
     private function serverCertificateHandshake($connection,$client)
     {
         $package = "";
-        $package = $this->pem2der(file_get_contents("/usr/local/web/crt/rootCA.crt")).$package;
-        $package = $this->getSize($this->pem2der(file_get_contents("/usr/local/web/crt/rootCA.crt")),3).$package;
-        $package = $this->pem2der(file_get_contents("/usr/local/web/crt/web.blue-creature.com.crt")).$package;
-        $package = $this->getSize($this->pem2der(file_get_contents("/usr/local/web/crt/web.blue-creature.com.crt")),3).$package;
+        /*$package = $this->pem2der(file_get_contents("/usr/local/web/crt/rootCA.crt")).$package;
+        $package = $this->getSize($this->pem2der(file_get_contents("/usr/local/web/crt/rootCA.crt")),3).$package;*/
+        $package = $this->pem2der(file_get_contents("/etc/letsencrypt/live/8on.ru/cert.pem")).$package;
+        $package = $this->getSize($this->pem2der(file_get_contents("/etc/letsencrypt/live/8on.ru/cert.pem")),3).$package;
         $package = $this->getSize($package,3).$package;
         $package = $this->getSize($package,3).$package;
         $package = pack("C*",0x0b).$package;
@@ -214,10 +229,10 @@ class Handshake
         $signSTR = $key['dh']['p'].$signSTR;
         $signSTR = $this->getSize($key['dh']['p'],2).$signSTR;
 
-        openssl_sign($this->client['random'].$this->server['random'].$signSTR, $sign, openssl_pkey_get_private(file_get_contents("/usr/local/web/crt/web.blue-creature.com.key")),"sha256WithRSAEncryption");
+        openssl_sign($this->client['random'].$this->server['random'].$signSTR, $sign, openssl_pkey_get_private(file_get_contents("/etc/letsencrypt/live/8on.ru/privkey.pem")),"sha1WithRSAEncryption");
         $package = $sign;
         $package = $this->getSize($package,2).$package;
-        $package = pack("C*",0x04,0x01).$package;
+        $package = pack("C*",0x02,0x01).$package;
         $package = $signSTR.$package;
         $package = $this->getSize($package,3).$package;
         $package = pack("C*",0x0c).$package;
@@ -273,12 +288,14 @@ class Handshake
         $this->generateMasterSecret();
         $this->generateEncryptionKeys($this->server['MasterSecret'], $this->client['random'], $this->server['random']);
         $decrypted = openssl_decrypt($recordEncryptedData,"aes-128-cbc",$this->client['write-key'],OPENSSL_RAW_DATA,$this->client['iv']);
-
         $this->messages[] = substr($decrypted, 0, 16);
         $seq = "0000000000000000";
         $rechd = "160303";
         $datalen = "0010";
-        $client_mac = hash_hmac("sha256", hex2bin($seq.$rechd.$datalen).substr($decrypted, 0, 16), $this->client['mac-key'], true);
+        $client_mac = hash_hmac("sha1", hex2bin($seq.$rechd.$datalen).substr($decrypted, 0, 16), $this->client['mac-key'], true);
+        var_dump($record['length']);
+        var_dump(bin2hex($decrypted));
+        var_dump(bin2hex($client_mac));
     }
 
     private function p_hash($algo, $secret, $seed, $size) {
@@ -297,12 +314,18 @@ class Handshake
     }
     private function generateEncryptionKeys($master_secret, $client_random, $server_random) {
         $key_buffer = $this->prf_tls12($master_secret, "key expansion", $server_random.$client_random, 128);
-        $this->client['mac-key'] = substr($key_buffer, 0, 32);
+        /*$this->client['mac-key'] = substr($key_buffer, 0, 32);
         $this->server['mac-key'] = substr($key_buffer, 32, 32);
         $this->client['write-key'] = substr($key_buffer, 64, 16);
         $this->server['write-key'] = substr($key_buffer, 80, 16);
         $this->client['iv-key'] = substr($key_buffer, 96, 16);
-        $this->server['iv-key'] = substr($key_buffer, 112, 16);
+        $this->server['iv-key'] = substr($key_buffer, 112, 16);*/
+        $this->client['mac-key'] = substr($key_buffer, 0, 20);
+        $this->server['mac-key'] = substr($key_buffer, 20, 20);
+        $this->client['write-key'] = substr($key_buffer, 40, 16);
+        $this->server['write-key'] = substr($key_buffer, 56, 16);
+        $this->client['iv-key'] = substr($key_buffer, 72, 16);
+        $this->server['iv-key'] = substr($key_buffer, 88, 16);
     }
     protected function prf_tls12($secret, $label, $seed, $size = 48) {
         return $this->p_hash("sha256", $secret, $label . $seed, $size);
@@ -326,21 +349,25 @@ class Handshake
         $seq = "0000000000000000";
         $rechd = "160303";
         $datalen = $this->getSize($decrypted,2);
-        $mac_key = hash_hmac("sha256", hex2bin($seq.$rechd).$datalen.$decrypted, $this->server['mac-key'], true);
-        $encrypt = openssl_encrypt($decrypted.$mac_key.hex2bin("0f"),"aes-128-cbc",$this->server['write-key'], OPENSSL_RAW_DATA, $encryptionIV);
+        $mac_key = hash_hmac("sha1", hex2bin($seq.$rechd).$datalen.$decrypted, $this->server['mac-key'], true);
+        $encrypt = openssl_encrypt($decrypted.$mac_key.hex2bin('0b'),"aes-128-cbc",$this->server['write-key'], OPENSSL_RAW_DATA, $encryptionIV);
         $package = $encrypt.$package;
-        $package =  $encryptionIV.$package;
+        $package = $encryptionIV.$package;
         $package = $this->handshakeRecord($package,true);
+        var_dump(strtoupper(bin2hex($decrypted.$mac_key.hex2bin("0f"))));
+        var_dump(strtoupper(bin2hex($encryptionIV)));
+        var_dump(strtoupper(bin2hex($this->server['mac-key'])));
+        var_dump(strtoupper(bin2hex(hex2bin($seq.$rechd).$datalen.$decrypted)));
     }
 
     private function pem2der($pem,$str="CERTIFICATE")
     {
         $begin = $str."-----";
-       $end   = "-----END";
-       $pem = substr($pem, strpos($pem, $begin)+strlen($begin));
-       $pem = substr($pem, 0, strpos($pem, $end));
-       $der = base64_decode($pem);
-       return $der;
+        $end   = "-----END";
+        $pem = substr($pem, strpos($pem, $begin)+strlen($begin));
+        $pem = substr($pem, 0, strpos($pem, $end));
+        $der = base64_decode($pem);
+        return $der;
     }
     private function handshakeRecord($record,$sent=false)
     {

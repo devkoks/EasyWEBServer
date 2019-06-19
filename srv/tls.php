@@ -7,7 +7,7 @@ class tls
     const PROTOCOL_TLS11 = 0x0302;
     const PROTOCOL_TLS12 = 0x0303;
 
-    const TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256   = 0xCCA8;
+    /*const TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256   = 0xCCA8;
     const TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 = 0xCCA9;
     const TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256         = 0xC02F;
     const TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384         = 0xC030;
@@ -22,7 +22,7 @@ class tls
     const TLS_RSA_WITH_AES_128_CBC_SHA                  = 0x002F;
     const TLS_RSA_WITH_AES_256_CBC_SHA                  = 0x0035;
     const TLS_ECDHE_RSA_WITH_3DES_EDE_CBC_SHA           = 0xC012;
-    const TLS_RSA_WITH_3DES_EDE_CBC_SHA                 = 0x000A;
+    const TLS_RSA_WITH_3DES_EDE_CBC_SHA                 = 0x000A;*/
 
     private $protocol_version = 0;
     private $chipher_suite = 0;
@@ -106,7 +106,7 @@ class tls
             $len[strlen($len)-4].$len[strlen($len)-3].
             $len[strlen($len)-2].$len[strlen($len)-1]);
 
-        $mac_key = hash_hmac("sha256", hex2bin($seq.$rechd).$datalen.$content, $this->server['mac-key'], true);
+        $mac_key = hash_hmac("sha1", hex2bin($seq.$rechd).$datalen.$content, $this->server['mac-key'], true);
         $encrypt = openssl_encrypt($content.$mac_key.hex2bin("0b"),"aes-128-cbc",$this->server['write-key'], OPENSSL_RAW_DATA, $encryptionIV);
 
         $package = $encrypt.$package;
@@ -418,16 +418,22 @@ class tls
     private function generateEncryptionKeys($master_secret, $client_random, $server_random) {
         // TLS_RSA_WITH_RC4_128_SHA has 20byte mac + 16byte key means 72 bytes of data is needed
         $key_buffer = $this->prf_tls12($master_secret, "key expansion", $server_random.$client_random, 128);
-        $this->client['mac-key'] = substr($key_buffer, 0, 32);
+        /*$this->client['mac-key'] = substr($key_buffer, 0, 32);
         $this->server['mac-key'] = substr($key_buffer, 32, 32);
         $this->client['write-key'] = substr($key_buffer, 64, 16);
         $this->server['write-key'] = substr($key_buffer, 80, 16);
         $this->client['iv-key'] = substr($key_buffer, 96, 16);
-        $this->server['iv-key'] = substr($key_buffer, 112, 16);
+        $this->server['iv-key'] = substr($key_buffer, 112, 16);*/
+        $this->client['mac-key'] = substr($key_buffer, 0, 20);
+        $this->server['mac-key'] = substr($key_buffer, 20, 20);
+        $this->client['write-key'] = substr($key_buffer, 40, 16);
+        $this->server['write-key'] = substr($key_buffer, 56, 16);
+        $this->client['iv-key'] = substr($key_buffer, 72, 16);
+        $this->server['iv-key'] = substr($key_buffer, 88, 16);
         // var_dump(bin2hex($this->client['mac-key']),bin2hex($this->server['mac-key']),bin2hex($this->client['write-key']),bin2hex($this->server['write-key']), bin2hex($this->client['iv']), bin2hex($this->server['iv']));
     }
     protected function prf_tls12($secret, $label, $seed, $size = 48) {
-        return $this->p_hash("sha256", $secret, $label . $seed, $size);
+        return $this->p_hash("sha1", $secret, $label . $seed, $size);
     }
 
     private function serverHandshakeFinished($connection)
@@ -437,8 +443,8 @@ class tls
         $decrypted = "";
         //echo "handshake_msg_hash:".bin2hex(hash("sha256",implode("",$this->messages),true)).PHP_EOL.PHP_EOL;
         $a0=$seed = "server finished".hash("sha256",implode("",$this->messages),true);
-        $a1 = hash_hmac("sha256",$a0,$this->server['MasterSecret'],true);
-        $p1 = hash_hmac("sha256",$a1.$seed,$this->server['MasterSecret'],true);
+        $a1 = hash_hmac("sha1",$a0,$this->server['MasterSecret'],true);
+        $p1 = hash_hmac("sha1",$a1.$seed,$this->server['MasterSecret'],true);
 
         $decrypted = substr($p1, 0, 12).$decrypted;
 
@@ -460,7 +466,7 @@ class tls
         $datalen = hex2bin(
             $len[strlen($len)-4].$len[strlen($len)-3].
             $len[strlen($len)-2].$len[strlen($len)-1]);
-        $mac_key = hash_hmac("sha256", hex2bin($seq.$rechd).$datalen.$decrypted, $this->server['mac-key'], true);
+        $mac_key = hash_hmac("sha1", hex2bin($seq.$rechd).$datalen.$decrypted, $this->server['mac-key'], true);
         $encrypt = openssl_encrypt($decrypted.$mac_key.hex2bin("0f"),"aes-128-cbc",$this->server['write-key'], OPENSSL_RAW_DATA, $encryptionIV);
         $package = $encrypt.$package;
         $package =  $encryptionIV.$package;

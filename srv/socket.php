@@ -52,14 +52,15 @@ class socket
 
     public function start()
     {
+        $protocol = strtoupper($this->__protocol);
         $proto = __DIR__."/protocols/".$this->__protocol."/".$this->__protocol.".php";
         if(file_exists($proto)){
             require_once $proto;
         }else{
             throw new \Exception("Protocol not suppored", 2);
         }
-        if(class_exists($this->__protocol,false))
-            $this->engine = new $this->__protocol();
+        if(class_exists($protocol,false))
+            $this->engine = new $protocol($this);
 
         $this->server();
     }
@@ -105,6 +106,9 @@ class socket
                 $content = "";
                 $client = "";
                 try{
+                    if(method_exists($this->engine,"prepareConnection"))
+                        $this->engine->prepareConnection($connection);
+
                     $client = $this->engine->recv($connection,$content);
                     socket_getpeername($connection,$ip);
                     $execute = new execute($this->context,$client,$ip);

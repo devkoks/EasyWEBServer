@@ -1,5 +1,5 @@
 <?php
-class tls
+class TLS
 {
     const PARAM_TIMEOUT     = 1;
 
@@ -11,6 +11,7 @@ class tls
 
     private $socket;
     private $connection;
+    private $version = 0x0303;
     private $handshake;
 
     public function __construct($params=[])
@@ -28,11 +29,17 @@ class tls
         return $this->socket;
     }
 
+    public function prepareConnection($connection=null)
+    {
+        if($connection==null) return false;
+
+        require_once "12/handshake.php";
+        $this->handshake = new srv\protocol\tls\tls12\Handshake();
+        $this->handshake->handshake($connection);
+    }
+
     public function recv($connection)
     {
-        require_once "12/handshake.php";
-        $this->handshake = new srv\tls\tls12\Handshake();
-        $this->handshake->handshake($connection);
         return $this->handshake->recv($connection);
     }
 
@@ -50,5 +57,22 @@ class tls
             default:
                 throw new \Exception("Undefine parameter", 1);
         }
+    }
+    public function getRecordPackage($type=0x16,$record)
+    {
+        $package = pack("C*",$type,0x03,0x03);
+        $package .= $this->getPackageSize($record,2);
+        $package .= $record;
+        return $package;
+    }
+    public function getPackageSize($package,$bytes=2)
+    {
+        $len = unpack("H*",pack("@".$bytes."N",strlen($package)))[1];
+        $hex = "";
+        for($i=1;$i<=$bytes*2;$i++){
+            $hex = $len[strlen($len)-$i].$hex;
+        }
+        $size = hex2bin($hex);
+        return $size;
     }
 }

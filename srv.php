@@ -1,3 +1,4 @@
+#!/usr/bin/php -d pcre.jit=0
 <?php
 declare(ticks = 1);
 function shutdown($socket=null){

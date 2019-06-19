@@ -1,5 +1,5 @@
 <?php
-class tcp
+class TCP
 {
     const PARAM_TIMEOUT     = 1;
 
