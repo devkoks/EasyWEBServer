@@ -12,6 +12,7 @@ return [
         "class"=>"index",
         "method"=>"init"
     ],
+    "logs"=>'/var/log/easywebserver',
     "max-connections"=>1000,
     "max-timeout-connections"=>1,
     "time-to-restart"=>[30,300],

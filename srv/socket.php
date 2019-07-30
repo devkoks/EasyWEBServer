@@ -60,7 +60,7 @@ class socket
         if(file_exists($proto)){
             require_once $proto;
         }else{
-            print "[ ERROR ] Protocol not suppored".PHP_EOL;
+            slog("ERROR","Protocol not suppored");
         }
         if(class_exists($protocol,false))
             $this->engine = new $protocol($this);
@@ -76,11 +76,11 @@ class socket
     public function server()
     {
         try{
-            print "[ INFO ] Open socket...".PHP_EOL;
+            slog("INFO","Open socket...");
             $this->socket = $this->openServerSocket();
-            print "[ OK ] Web server started!".PHP_EOL;
+            slog("OK","Web server started!");
         }catch(Exception $e){
-            print "[ FAIL ] Web server not started!".PHP_EOL;
+            slog("FAIL","Web server not started!");
             exit($e);
         }
         register_shutdown_function('shutdown',$this->socket);
@@ -92,11 +92,11 @@ class socket
         pcntl_signal(SIGINT,'sig_handler');
         while(pcntl_waitpid(0, $status) != -1){
             $status = pcntl_wexitstatus($status);
-            print "[ FAIL ] Child ".$status." exited".PHP_EOL;
+            slog("FAIL","Child ".$status." exited");
         }
         $_SERVER['__IPC']->close();
         socket_close($this->socket);
-        print "[ FAIL ] Socket closed!".PHP_EOL;
+        slog("FAIL","Socket closed!");
     }
 
     private function fork()
@@ -104,7 +104,7 @@ class socket
         $pid = pcntl_fork();
         if($pid != 0) return;
         $childpid = posix_getpid();
-        print "[ OK ] Thread proccess started. pid:".$childpid.PHP_EOL;
+        slog("OK","Thread proccess started. pid:".$childpid);
         $count = 0;
         while ($this->run) {
             $connection = @socket_accept($this->socket);
@@ -127,17 +127,17 @@ class socket
                 $content = $execute->getReturn();
                 unset($execute);
             }catch(Exception $e){
-                print "Error: ".$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine();
-                print PHP_EOL;
-                print $e->getTraceAsString();
+                slog("ERROR",$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine().
+                PHP_EOL.
+                $e->getTraceAsString());
             }catch(Error $e){
-                print "Error: ".$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine();
-                print PHP_EOL;
-                print $e->getTraceAsString();
+                slog("ERROR",$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine().
+                PHP_EOL.
+                $e->getTraceAsString());
             }catch(ErrorException $e){
-                print "Error: ".$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine();
-                print PHP_EOL;
-                print $e->getTraceAsString();
+                slog("ERROR",$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine().
+                PHP_EOL.
+                $e->getTraceAsString());
             }
             $this->engine->send($connection,$content);
             socket_close($connection);
@@ -151,7 +151,7 @@ class socket
         $this->socket = $this->engine->open($this->__host,$this->__port);
         if(!$this->socket)
             throw new Exception("Error starting server[{$errno}]: {$errstr}");
-        print "[ OK ] Listening on {$this->__protocol}://{$this->__host}:{$this->__port}".PHP_EOL;
+        slog("OK","Listening on {$this->__protocol}://{$this->__host}:{$this->__port}");
         return $this->socket;
     }
 

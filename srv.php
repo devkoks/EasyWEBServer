@@ -1,4 +1,4 @@
-#!/usr/bin/php -d pcre.jit=0
+#!/usr/bin/php
 <?php
 declare(ticks = 1);
 function shutdown($socket=null){
@@ -15,16 +15,21 @@ class srv
 
     public function __construct()
     {
-	$this->__args = include "srv/arguments.php";	
-	if(isset($this->__args['g']))
-             $this->__conf = include $this->__args['g'];
-	else
-	     $this->__conf = include "srv/srv.conf.php";
+    	$this->__args = include "srv/arguments.php";
+    	if(isset($this->__args['g']))
+                 $this->__conf = include $this->__args['g'];
+    	else
+	       $this->__conf = include "srv/srv.conf.php";
+
+        $_SERVER["CONF"] = $this->__conf;
+        $_SERVER["LOGS_ENABLE"] = false;
+        if(isset($this->__args['d'])) $_SERVER["LOGS_ENABLE"] = true;
+        include "srv/log.php";
         include "srv/IPC.php";
         include "srv/execute.php";
         include "srv/socket.php";
         include $this->__conf["start"]["dir"].$this->__conf["start"]["file"];
-        print "[ INFO ] Starting web server...".PHP_EOL;
+        slog("INFO","Starting web server...");
         while($this->status){
             $this->socket();
             //More...
