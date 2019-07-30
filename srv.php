@@ -15,8 +15,11 @@ class srv
 
     public function __construct()
     {
-        $this->__conf = include "srv.conf.php";
-        $this->__args = include "srv/arguments.php";
+	$this->__args = include "srv/arguments.php";	
+	if(isset($this->__args['g']))
+             $this->__conf = include $this->__args['g'];
+	else
+	     $this->__conf = include "srv.conf.php";
         include "srv/IPC.php";
         include "srv/execute.php";
         include "srv/socket.php";
