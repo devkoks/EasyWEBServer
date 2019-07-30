@@ -111,8 +111,8 @@ class TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
         $recordEncryptedData = substr($message,$ivLenght,strlen($message));
         $decrypted = openssl_decrypt($recordEncryptedData,"aes-128-cbc",$clientWriteKey,OPENSSL_RAW_DATA|OPENSSL_ZERO_PADDING,$recordIV);
         $padding = substr($decrypted,-1);
-        $paddingLen = dechex(bin2hex($padding));
-        for($i=0;$i<$paddingLen;$i++) $decrypted .= $padding;
+        $paddingLen = hexdec(bin2hex($padding));
+        //for($i=0;$i<$paddingLen;$i++) $decrypted .= $padding;
         $decrypted = substr($decrypted,0,strlen($decrypted)-$paddingLen-1);
         $decrypted = substr($decrypted,0,strlen($decrypted)-20);
         return $decrypted;
