@@ -22,23 +22,21 @@ class execute
         $this->__client["addr"] = $ip;
 
         $this->parseClientContent();
-        $this->header("HTTP/1.1 200 OK");
+        $this->status(200,'OK');
         $this->header("Server: EasyServer 0.1");
         if($this->select() == "application/x-httpd-php"){
-            $this->__content = $this->run();
             $this->header("Content-type: text/html");
+            $this->__content = $this->run();
         }else{
             $dir = $this->conf["start"]["dir"].parse_url($this->__url,PHP_URL_PATH);
-            if(!file_exists($dir)){
-                $dir = $this->conf["error-page"]["404"];
-            }
+            if(!file_exists($dir)) $dir = $this->conf["error-page"]["404"];
             $this->header("Content-type: ".$this->select());
             $size = filesize($dir);
             if($size!=0){
                 $f=fopen($dir,"r");
                 $this->__content = fread($f,$size);
                 fclose($f);
-                $ETag = md5($this->__content);
+                /*$ETag = md5($this->__content);
                 $this->header("Date: ".date("r"));
                 $this->header("ETag: ".$ETag);
                 if(isset($this->__client["headers"]["If-None-Match"])){
@@ -52,7 +50,7 @@ class execute
                 }else{
                     $this->header("Accept-Ranges: bytes");
                     $this->header("Content-Length: ".strlen($this->__content));
-                }
+                }*/
             }
             unset($size,$dir,$f);
         }
@@ -104,23 +102,30 @@ class execute
         $method = $this->conf["start"]["method"];
         $data = $this->server();
         $data['SERVER']['__IPC'] = $_SERVER['__IPC'];
+        $LOGS_ENABLED = $_SERVER["LOGS_ENABLE"];
         $_SERVER = $data['SERVER'];
         $_SERVER['__SRV'] = $this;
         $_GET = $data['GET'];
         $_POST = $data['POST'];
         $_COOKIE = $data['COOKIE'];
         $_FILES = $data['FILES'];
+
         if($this->isBuffer){
             ob_start();
             $index = new $class();
             $index->$method($data);
-            return ob_get_clean();
+            $this->__content = ob_get_clean();
         }else{
             $index = new $class();
             $index->$method($data);
-            return $this->__content;
         }
-
+        $_SERVER["CONF"] = $this->conf;
+        $_SERVER["LOGS_ENABLE"] = $LOGS_ENABLED;
+        foreach($data['FILES'] as $file){
+            unlink($file['tmp_name']);
+            slog("CLEAR","Removed uploaded file:".$file['tmp_name']);
+        }
+        return $this->__content;
     }
 
     private function server()
@@ -168,13 +173,15 @@ class execute
                 if(isset($header[1]) and !empty($header[1])){
                     switch($header[0]){
                         case "multipart/form-data":
-                            $return = [];
+                            $post = [];
                             $params = $this->parseBoundaryContent($this->__client["headers"]["Content-Type"],$this->__client["body"]);
                             foreach($params as $name => $param){
                                 if(!isset($param["headers"]["Content-Disposition"]["filename"])){
-                                    $return[$name] = $param["body"];
+                                    $post[] = $name."=".trim($param["body"]);
                                 }
                             }
+                            $return = [];
+                            parse_str(implode("&",$post),$return);
                             return $return;
                         break;
                         default:
@@ -206,10 +213,36 @@ class execute
         foreach($posts as $name => $post){
             if(isset($post["headers"]["Content-Disposition"]["filename"])){
                 $files[$name]["filename"] = $post["headers"]["Content-Disposition"]["filename"];
-                $files[$name]["content"] = $post["body"];
+                $files[$name]["tmp_name"] = "/tmp/ews.upl.".$this->generateRandomString(6);
+                $files[$name]["filesize"] = strlen($post["body"]);
+                $f=fopen($files[$name]["tmp_name"],"w");
+                fwrite($f,$post["body"]);
+                fclose($f);
+                unset($post["body"]);
             }
         }
         return $files;
+    }
+
+    private function generateRandomString($length = 8) {
+        $characters = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        $charactersLength = strlen($characters);
+        $randomString = '';
+        for ($i = 0; $i < $length; $i++) {
+            $randomString .= $characters[rand(0, $charactersLength - 1)];
+        }
+        return $randomString;
+    }
+
+    public static function parseHeaders($raw)
+    {
+        $headers = [];
+        foreach(explode("\r\n",$raw) as $header){
+            $hh = explode(":",$header);
+            if(!empty(trim($hh[0])))
+                $headers[trim($hh[0])] = (isset($hh[1])) ? trim($hh[1]) : true;
+        }
+        return $headers;
     }
 
     private function parseClientContent()
@@ -258,7 +291,10 @@ class execute
             if(empty($arr)) continue;
             $headers=[];
             $heads = explode("\r\n\r\n",$arr);
-            $body = $heads[1];
+            $body = $heads;
+            unset($body[0]);
+            $body = implode("\r\n\r\n",$body);
+            $body = substr($body,0,strlen($body)-4);
             $heads = explode("\r\n",$heads[0]);
             foreach($heads as $head){
                 $head = trim($head);
@@ -283,4 +319,3 @@ class execute
     }
 
 }
-

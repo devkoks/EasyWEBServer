@@ -5,7 +5,7 @@ return [
     "host"=>"0.0.0.0",
     "port"=>10443,
     "protocol"=>"tls",
-    "threads"=>48,
+    "threads"=>6,
     "start"=>[
         "dir"=>"/usr/local/www/billing",
         "file"=>"/index.php",

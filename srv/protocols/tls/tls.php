@@ -18,6 +18,8 @@ class TLS
     private $version = 0x0303;
     private $conf;
     private $handshake;
+    private $close = false;
+    private $decrypted_buff = "";
     public function __construct($context)
     {
         $this->conf = $context->srv->getConf();
@@ -31,6 +33,7 @@ class TLS
         socket_set_option($this->socket, SOL_SOCKET, SO_REUSEADDR, 1);
         socket_bind($this->socket, $this->__host, $this->__port);
         socket_listen($this->socket, 10);
+        socket_set_block($this->socket);
         return $this->socket;
     }
 
@@ -41,31 +44,70 @@ class TLS
         $this->handshake = new \srv\protocol\tls\Handshake($connection,$this->conf);
     }
 
-    public function recv($connection)
+    public function getHeaders($connection)
+    {
+        $headers = $this->recv($connection,"\r\n\r\n");
+        return $headers;
+    }
+    public function getBody($connection,$len)
+    {
+        $get = true;
+        if(strlen($this->decrypted_buff)>=$len) return $this->decrypted_buff;
+        while($get){
+            $pkg = $this->getPackage($connection);
+            if(unpack("C*",$pkg['type'])[1]==self::HEADER_APP_DATA){
+                $this->decrypted_buff .= $this->appData($pkg['data']);
+                if(strlen($this->decrypted_buff)>=$len){
+                    $get = false;
+                    return $this->decrypted_buff;
+                }
+            }
+        }
+        return $this->decrypted_buff;
+    }
+
+    public function recv($connection,$end_point=null)
     {
         $get = true;
         $content = "";
         while($get){
-            $pkgs = $this->getPackage($connection);
-            foreach($pkgs as $pkg){
-                switch(unpack("C*",$pkg['type'])[1]){
-                    case self::HEADER_HANDSHAKE:
-                        $this->handshake->rawPackage($pkg['data']);
-                    break;
-                    case self::HEADER_ALERT:
-                        $this->alert($pkg['data']);
-                    break;
-                    case self::HEADER_CHANGE_CIPER_SPEC:
-                    break;
-                    case self::HEADER_APP_DATA:
-                        $content .= $this->appData($pkg['data']);
-                    break;
-                    default:
-                        socket_close($connection);
-                        return false;
-                }
+            $pkg = $this->getPackage($connection);
+            //var_dump(bin2hex($pkg['type']));
+            if($pkg === false){
+                $get = false;
+                continue;
             }
-            if(count($pkgs)==0) $get = false;
+            switch(unpack("C*",$pkg['type'])[1]){
+                case self::HEADER_HANDSHAKE:
+                    $this->handshake->rawPackage($pkg['data']);
+                    $this->close = false;
+                break;
+                case self::HEADER_ALERT:
+                    $this->alert($pkg['data']);
+                break;
+                case self::HEADER_CHANGE_CIPER_SPEC:
+                break;
+                case self::HEADER_APP_DATA:
+                    $content .= $this->appData($pkg['data']);
+                    if($end_point!=null){
+                        $i=0;
+                        while(false !== ($buf = substr($content,$i,strlen($end_point)))){
+                            if($buf==$end_point){
+                                $get = false;
+                                $this->decrypted_buff = substr($content,$i+4,strlen($content)-$i);
+                                return substr($content,0,$i+1);
+                            }
+                            $i++;
+                        }
+                    }
+                break;
+                case "":
+                    $this->close = false;
+                break;
+                default:
+                    //socket_close($connection);
+                    return false;
+            }
         }
         if(strlen($content)==0) return false;
 
@@ -83,6 +125,8 @@ class TLS
             $package[$num] = TLS::getRecordPackage(0x17,$package[$num]);
         }
         $packages = implode("",$package);
+        socket_set_option($connection, SOL_SOCKET, SO_SNDTIMEO, ['sec'=>30,'usec'=>0]);
+        //var_dump($content);
         socket_write($connection,$packages);
     }
 
@@ -93,7 +137,13 @@ class TLS
     }
     private function alert($raw)
     {
-
+        $decrypted = $this->handshake->getCipher()->getDecryptedMessage(null,$raw,"0000000000000001","170303");
+        $alert = unpack("C*",$decrypted);
+        switch($alert[2]){
+            case 0x00:
+                $this->close = true;
+            break;
+        }
     }
 
     public static function getRecordPackage($type=0x16,$record)
@@ -114,24 +164,19 @@ class TLS
     }
     private function getPackage($connection)
     {
-        $done=false;
-        $packages = [];
-        $i=0;
-        do {
-            socket_set_option($connection, SOL_SOCKET, SO_RCVTIMEO, ['sec'=>0,'usec'=>55000]);
-            socket_recv($connection,$packages[$i]['type'],1,MSG_WAITALL);
+        if($this->close) return false;
+        $package = [];
+        socket_recv($connection,$packages['type'],1,MSG_WAITALL);
 
-            if(strlen($packages[$i]['type'])==0){
-                $done = true;
-                unset($packages[$i]);
-                continue;
-            }
-            socket_recv($connection,$packages[$i]['proto'],2,MSG_WAITALL);
-            socket_recv($connection,$packages[$i]['lenght'],2,MSG_WAITALL);
-            $packages[$i]['lenght'] = hexdec(bin2hex($packages[$i]['lenght']));
-            socket_recv($connection,$packages[$i]['data'],$packages[$i]['lenght'],MSG_WAITALL);
-            $i++;
-        } while(!$done);
+        if(strlen($packages['type'])==0){
+            unset($packages);
+            return false;
+        }
+        socket_recv($connection,$packages['proto'],2,MSG_WAITALL);
+        socket_recv($connection,$packages['lenght'],2,MSG_WAITALL);
+        $len = $packages['lenght'];
+        $packages['lenght'] = hexdec(bin2hex($packages['lenght']));
+        socket_recv($connection,$packages['data'],$packages['lenght'],MSG_WAITALL);
         return $packages;
     }
 }

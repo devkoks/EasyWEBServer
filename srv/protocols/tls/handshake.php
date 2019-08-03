@@ -19,6 +19,8 @@ class Handshake
     private $cipher;
     private $messages = [];
 
+    private $status = false;
+
     public function __construct($connection,$conf)
     {
         $this->connection = $connection;
@@ -27,6 +29,12 @@ class Handshake
 
     public function rawPackage($raw)
     {
+        if($this->getStatus()){
+            $this->clientHelloDone($raw);
+            $package = $this->serverHandshakeFinished();
+            socket_write($this->connection,$package);
+            return;
+        }
         switch(unpack("C*",substr($raw,0,1))[1]){
             case self::HEADER_CLIENTHELLO:
                 $this->clientHello($raw);
@@ -42,13 +50,13 @@ class Handshake
                 $this->server["PreMasterSecret"] = $this->cipher->getPreMasterSecret($this->client['public']);
                 $this->server['MasterSecret'] = $this->cipher->getMasterSecret($this->client['random'],$this->server['random'],$this->server['PreMasterSecret']);
                 $this->generateEncryptionKeys($this->server['MasterSecret'],$this->client['random'],$this->server['random']);
+                $this->status = true;
             break;
-            default:
-                $this->clientHelloDone($raw);
-                $package = $this->serverHandshakeFinished();
-                socket_write($this->connection,$package);
-                break;
         }
+    }
+    public function getStatus()
+    {
+        return $this->status;
     }
     public function getCipher()
     {
@@ -173,23 +181,7 @@ class Handshake
     }
     private function clientHelloDone($raw)
     {
-        $record = [];
-        $record['length'] = strlen($raw);
-        $i=0;
-        $ivLenght = openssl_cipher_iv_length("aes-128-cbc");
-
-        $recordIV = substr($raw,$i,$ivLenght);$i+=$ivLenght;
-        $this->client['iv'] = $recordIV;
-
-        $recordEncryptedData = substr($raw,$i,$record['length']-$ivLenght);$i+=$record['length']-$ivLenght;
-        $decrypted = "";
-
-        $decrypted = openssl_decrypt($recordEncryptedData,"aes-128-cbc",$this->client['write-key'],OPENSSL_RAW_DATA,$this->client['iv']);
-        $this->messages[] = substr($decrypted, 0, 16);
-        $seq = "0000000000000000";
-        $rechd = "160303";
-        $datalen = "0010";
-        $client_mac = hash_hmac("sha1", hex2bin($seq.$rechd.$datalen).substr($decrypted, 0, 16), $this->client['mac-key'], true);
+        $this->messages[] = $this->getCipher()->getDecryptedMessage(null,$raw,"0000000000000000","160303");
     }
 
     private function generateEncryptionKeys($master_secret, $client_random, $server_random)
