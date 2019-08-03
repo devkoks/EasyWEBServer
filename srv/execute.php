@@ -109,6 +109,7 @@ class execute
         $_POST = $data['POST'];
         $_COOKIE = $data['COOKIE'];
         $_FILES = $data['FILES'];
+        var_dump($this->__client['headers']);
 
         if($this->isBuffer){
             ob_start();
@@ -133,6 +134,7 @@ class execute
         return [
             "SERVER"=>[
                 //"LOCAL_PORT"=>$this->context->__port,
+                "SERVER_NAME"=>$this->__client['headers']["Host"],
                 "REMOTE_ADDR"=>$this->__client["addr"],
                 "PROTOCOL"=>$this->__client["protocol"],
                 "REQUEST_TYPE"=>$this->__client["request-type"],
@@ -239,8 +241,11 @@ class execute
         $headers = [];
         foreach(explode("\r\n",$raw) as $header){
             $hh = explode(":",$header);
-            if(!empty(trim($hh[0])))
-                $headers[trim($hh[0])] = (isset($hh[1])) ? trim($hh[1]) : true;
+            $name = trim($hh[0]);
+            unset($hh[0]);
+            if(isset($hh[1])) $value = implode(":",$hh);
+            if(!empty($name))
+                $headers[$name] = (isset($value)) ? trim($value) : true;
         }
         return $headers;
     }
@@ -262,11 +267,7 @@ class execute
             $this->__url = $http[1];
             $this->__client["protocol"] = $http[2];
             $this->__client["request-type"] = $http[0];
-            foreach($headers as $header){
-                $hh = explode(":",$header);
-                if(!empty(trim($hh[0])))
-                    $this->__client["headers"][trim($hh[0])] = (isset($hh[1])) ? trim($hh[1]) : true;
-            }
+            $this->__client["headers"] = self::parseHeaders($content[0]);
         }
         if(isset($content[1])){
             $this->__client["body"] = $content[1];
