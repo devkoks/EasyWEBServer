@@ -109,7 +109,6 @@ class execute
         $_POST = $data['POST'];
         $_COOKIE = $data['COOKIE'];
         $_FILES = $data['FILES'];
-        var_dump($this->__client['headers']);
 
         if($this->isBuffer){
             ob_start();
@@ -139,7 +138,8 @@ class execute
                 "PROTOCOL"=>$this->__client["protocol"],
                 "REQUEST_TYPE"=>$this->__client["request-type"],
                 "REQUEST_URI"=>$this->__url,
-                "REQUEST_TIME"=>time()
+                "REQUEST_TIME"=>time(),
+                "HTTP_HEADERS"=>$this->__client["headers"]
             ],
             "CLIENT"=>[
                 "headers"=>$this->__client["headers"],
@@ -259,7 +259,6 @@ class execute
 
         $content[1] = implode("\r\n\r\n",$content);
         $content[0] = $h;
-
         if(isset($content[0])){
             $headers = $content[0];
             $headers = explode(PHP_EOL,$headers);

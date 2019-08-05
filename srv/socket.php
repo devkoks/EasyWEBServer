@@ -118,9 +118,12 @@ class socket
                 $headers = $this->engine->getHeaders($connection);
                 $client .= $headers."\r\n\r\n";
                 $headers = execute::parseHeaders($headers);
+                if(count($headers)==0){
+                    socket_close($connection);
+                    continue;
+                }
                 if(isset($headers["Content-Length"]) && $headers["Content-Length"]>0)
                     $client .= $this->engine->getBody($connection,$headers["Content-Length"]);
-                //file_put_contents("/tmp/client.tmp",$client,FILE_APPEND);
                 if($client === false){
                     if(get_resource_type($connection)=="Socket")
                         socket_close($connection);

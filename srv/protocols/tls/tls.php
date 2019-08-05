@@ -137,8 +137,8 @@ class TLS
     }
     private function alert($raw)
     {
-        $decrypted = $this->handshake->getCipher()->getDecryptedMessage(null,$raw,"0000000000000001","170303");
-        $alert = unpack("C*",$decrypted);
+        //$decrypted = $this->handshake->getCipher()->getDecryptedMessage(null,$raw,"0000000000000001","170303");
+        $alert = unpack("C*",$raw);
         switch($alert[2]){
             case 0x00:
                 $this->close = true;
