@@ -2,7 +2,7 @@
 return [
     "server-root"=>"/usr/local/libdata/phpwebsrv",
     "pid"=>"server.pid",
-    "host"=>"6.6.6.184",
+    "host"=>"0.0.0.0",
     "port"=>10443,
     "protocol"=>"tls",
     "threads"=>6,
