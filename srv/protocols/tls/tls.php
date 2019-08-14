@@ -40,7 +40,7 @@ class TLS
             fclose($fcert);
             slog("INFO","Certificate created!");
         }
-    }
+    } 
 
     public function open($host,$port)
     {
