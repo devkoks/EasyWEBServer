@@ -23,6 +23,23 @@ class TLS
     public function __construct($context)
     {
         $this->conf = $context->srv->getConf();
+        slog("INFO","Starting TLS module...");
+        if(!file_exists($this->conf['tls']['priv']) or !file_exists($this->conf['tls']['cert'])){
+            slog("ERROR","Certificate not found");
+            slog("INFO","Creating certificate...");
+            $privateKey = openssl_pkey_new(["private_key_bits" => 2048,"private_key_type" => OPENSSL_KEYTYPE_RSA]);
+            $csr = openssl_csr_new(['commonName' => gethostname()], $privateKey, ['digest_alg' => 'sha256', 'req_extensions' => 'v3_req']);
+            openssl_pkey_export($privateKey,$keyOut);
+            $x509 = openssl_csr_sign($csr, null, $privateKey, 3600, ['digest_alg' => 'sha256', 'x509_extensions' => 'v3_ca'],time());
+            openssl_x509_export($x509, $crtOut);
+            $fpriv = fopen($this->conf['tls']['priv'],'w');
+            $fcert = fopen($this->conf['tls']['cert'],'w');
+            fwrite($fpriv, $keyOut);
+            fwrite($fcert, $crtOut);
+            fclose($fpriv);
+            fclose($fcert);
+            slog("INFO","Certificate created!");
+        }
     }
 
     public function open($host,$port)
