@@ -163,7 +163,7 @@ class execute
     private function post()
     {
         if(!isset($this->__client["headers"]["Content-Type"])) return [];
-        switch($this->__client["headers"]["Content-Type"]){
+        switch(explode(";",$this->__client["headers"]["Content-Type"])[0]){
             case "application/x-www-form-urlencoded":
                 return $this->parseUrlQuery($this->__client["body"]);
             break;
