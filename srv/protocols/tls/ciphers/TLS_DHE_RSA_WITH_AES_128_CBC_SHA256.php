@@ -95,7 +95,9 @@ class TLS_DHE_RSA_WITH_AES_128_CBC_SHA256
         $datalen = TLS::getPackageSize($message,2);
         $mac_key = hash_hmac("sha256", hex2bin($seq.$rechd).$datalen.$message, $serverMac, true);
         $paddingLen = 16-(strlen($message.$mac_key) % 16)-1;
-        $encrypt = openssl_encrypt($message.$mac_key.pack('C*',$paddingLen),"aes-128-cbc",$serverWriteKey, OPENSSL_RAW_DATA | OPENSSL_ZERO_PADDING, $encryptionIV);
+		if($paddingLen==0)
+			$paddingLen = 16;
+        $encrypt = openssl_encrypt($message.$mac_key.pack('C*',$paddingLen),"aes-128-cbc",$serverWriteKey, OPENSSL_RAW_DATA, $encryptionIV);
         return $encryptionIV.$encrypt;
     }
     public function getDecryptedMessage($clientWriteKey,$message,$seq,$rechd)
