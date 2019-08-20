@@ -3,7 +3,7 @@ namespace srv;
 
 class IPC
 {
-    private $lim    = 1024;
+    private $lim    = 134217728;
     private $shm    = null;
 
 
@@ -12,6 +12,10 @@ class IPC
         if($ftok == null)
             $ftok = ftok(__FILE__,"t");
         $this->shm = shm_attach($ftok,$this->lim);
+    }
+    public function __destruct()
+    {
+        $this->close();
     }
     public function get(int $id)
     {
@@ -28,6 +32,8 @@ class IPC
     }
     public function close()
     {
+        if(get_resource_type($this->shm)!="sysvshm") return;
+        shm_remove($this->shm);
         shm_detach($this->shm);
     }
 }
