@@ -108,6 +108,8 @@ class socket
         $count = 0;
         while ($this->run) {
             $connection = @socket_accept($this->socket);
+            while(pcntl_waitpid(0, $status, WNOHANG) != -1)
+                $status = pcntl_wexitstatus($status);
             if(!$connection) continue;
             $count++;
             $content = "";
