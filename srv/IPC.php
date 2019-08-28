@@ -20,7 +20,7 @@ class IPC
     }
     public function get($name)
     {
-        if(!$this->isset($this->key($name))) return null;
+        if(!$this->isset($name)) return null;
         return shm_get_var($this->shm,$this->key($name));
     }
     public function set($name, $var)
