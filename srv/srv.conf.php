@@ -18,6 +18,19 @@ return [
     "time-to-restart"=>[30,300],
     "count-to-next-level"=>3,
     "tls"=>[
+        "auto-create-cert"=>[
+            "enabled"=>true,
+            "generate-type"=>"zfs",
+            "zfs"=>[
+                "dataset"=>"data/cfg",
+                "cert-path"=>"/easywebserver/tls/default.crt",
+                "key-path"=>"/easywebserver/tls/default.key"
+            ],
+            "fs"=>[
+                "cert-path"=>"/usr/local/etc/phpwebsrv/easywebserver/tls/default.crt",
+                "key-path"=>"/usr/local/etc/phpwebsrv/easywebserver/tls/default.key"
+            ]
+        ],
         "cert"=>"/usr/local/etc/phpwebsrv/tls/default.crt",
         "priv"=>"/usr/local/etc/phpwebsrv/tls/default.key"
     ],

@@ -32,15 +32,28 @@ class TLS
             openssl_pkey_export($privateKey,$keyOut);
             $x509 = openssl_csr_sign($csr, null, $privateKey, 3600, ['digest_alg' => 'sha256', 'x509_extensions' => 'v3_ca'],time());
             openssl_x509_export($x509, $crtOut);
-            $fpriv = fopen($this->conf['tls']['priv'],'w');
-            $fcert = fopen($this->conf['tls']['cert'],'w');
+            switch($this->conf['tls']['auto-create-cert']['generate-type']){
+                case "zfs":
+                $zroot = zfs_mount_list();
+                $zroot = $zroot[$this->conf['tls']['auto-create-cert']['zfs']['dataset']];
+                $fpriv = fopen($zroot.$this->conf['tls']['auto-create-cert']['zfs']['key-path'],'w');
+                $fcert = fopen($zroot.$this->conf['tls']['auto-create-cert']['zfs']['cert-path'],'w');
+                fwrite($fpriv, $keyOut);
+                fwrite($fcert, $crtOut);
+                fclose($fpriv);
+                fclose($fcert);
+                break;
+            }
+            $fpriv = fopen($this->conf['tls']['auto-create-cert']['fs']['key-path'],'w');
+            $fcert = fopen($this->conf['tls']['auto-create-cert']['fs']['cert-path'],'w');
             fwrite($fpriv, $keyOut);
             fwrite($fcert, $crtOut);
             fclose($fpriv);
             fclose($fcert);
+
             slog("INFO","Certificate created!");
         }
-    } 
+    }
 
     public function open($host,$port)
     {
