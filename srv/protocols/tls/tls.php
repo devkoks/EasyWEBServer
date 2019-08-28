@@ -34,14 +34,18 @@ class TLS
             openssl_x509_export($x509, $crtOut);
             switch($this->conf['tls']['auto-create-cert']['generate-type']){
                 case "zfs":
-                $zroot = zfs_mount_list();
-                $zroot = $zroot[$this->conf['tls']['auto-create-cert']['zfs']['dataset']];
-                $fpriv = fopen($zroot.$this->conf['tls']['auto-create-cert']['zfs']['key-path'],'w');
-                $fcert = fopen($zroot.$this->conf['tls']['auto-create-cert']['zfs']['cert-path'],'w');
+                zfs_mount($this->conf['tls']['auto-create-cert']['zfs']['dataset']);
+                $zroot = zfs_ds_list(['mountpoint']);
+                $zroot = $zroot[$this->conf['tls']['auto-create-cert']['zfs']['dataset']]['mountpoint'];
+                $fpriv = fopen("/etc".$this->conf['tls']['auto-create-cert']['zfs']['key-path'],'w');
+                $fcert = fopen("/etc".$this->conf['tls']['auto-create-cert']['zfs']['cert-path'],'w');
                 fwrite($fpriv, $keyOut);
                 fwrite($fcert, $crtOut);
                 fclose($fpriv);
                 fclose($fcert);
+                copy("/etc".$this->conf['tls']['auto-create-cert']['zfs']['key-path'],$zroot.$this->conf['tls']['auto-create-cert']['zfs']['key-path']);
+                copy("/etc".$this->conf['tls']['auto-create-cert']['zfs']['cert-path'],$zroot.$this->conf['tls']['auto-create-cert']['zfs']['cert-path']);
+                zfs_unmount($this->conf['tls']['auto-create-cert']['zfs']['dataset']);
                 break;
             }
             $fpriv = fopen($this->conf['tls']['auto-create-cert']['fs']['key-path'],'w');
