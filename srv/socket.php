@@ -133,7 +133,7 @@ class socket
                 }
                 socket_getpeername($connection,$ip);
                 print "[Num:".$count.",fork:".$childpid."]-->Request[".$ip."]".PHP_EOL;
-                $execute = new execute($this->srv,$client,$ip);
+                $execute = new execute($this->srv,$client,$ip,$connection);
                 $content = $execute->getReturn();
                 unset($execute);
             }catch(Exception $e){

@@ -9,14 +9,16 @@ class execute
 
     private $isBuffer = false;
     private $context;
+    private $connection;
     private $conf;
     private $return;
 
-    public function __construct($context,$client,$ip)
+    public function __construct($context,$client,$ip,$connection)
     {
         $content = "";
 
         $this->context = $context;
+        $this->connection = $connection;
         $this->conf = $this->context->getConf();
         $this->__client["content"] = $client;
         $this->__client["addr"] = $ip;
@@ -86,6 +88,11 @@ class execute
     public function getReturn()
     {
         return $this->return;
+    }
+
+    public function closeConnection()
+    {
+        socket_close($this->connection);
     }
 
     private function select()
