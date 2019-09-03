@@ -13,6 +13,8 @@ class srv
     private $__args = [];
     private $status = true;
 
+    const SRV_SHUTDOWN = 9;
+
     public function __construct()
     {
     	$this->__args = include "srv/arguments.php";
@@ -36,6 +38,11 @@ class srv
         }
     }
 
+    public function stop()
+    {
+        $this->status = false;
+    }
+
     public function getConf(){return $this->__conf;}
 
     private function socket()
@@ -54,4 +61,20 @@ class srv
         $socket->start();
     }
 
-} new srv();
+}
+
+if(isset($argv[1])){
+    switch($argv[1]){
+        case "start":
+            (pcntl_fork()==0) ? new srv() : exit();
+        break;
+        case "stop":
+            $msg = msg_get_queue(1,0444);
+            msg_send($msg,1,srv::SRV_SHUTDOWN);
+        break;
+        case "restart":
+        break;
+        default:
+            print "Unknown command: ".$argv[1].PHP_EOL;
+    }
+}

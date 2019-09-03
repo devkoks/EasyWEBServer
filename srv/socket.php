@@ -70,7 +70,6 @@ class socket
     public function stop()
     {
         $this->run = false;
-        socket_close($this->socket);
     }
 
     public function server()
@@ -85,14 +84,33 @@ class socket
         }
         register_shutdown_function('shutdown',$this->socket);
 
+
         $_SERVER['__IPC'] = new IPC();
         for($i = 0; $i < $this->__threads; $i++){
-            $this->fork();
+            $this->childs[$this->fork()] = true;
         }
         pcntl_signal(SIGINT,'sig_handler');
-        while(pcntl_waitpid(0, $status) != -1){
-            $status = pcntl_wexitstatus($status);
-            slog("FAIL","Child ".$status." exited");
+        pcntl_signal(SIGTERM,'sig_handler');
+        $state = true;
+        while($state){
+            $pid = pcntl_waitpid(-1,$status,WNOHANG);
+            if($pid > 0){
+                unset($this->childs[$pid]);
+                $status = pcntl_wexitstatus($status);
+                slog("FAIL","Child ".$status." exited");
+            }
+            if(count($this->childs)==0) $state = false;
+
+            $recv = $_SERVER['__IPC']->recv();
+            if(!empty($recv)){
+                switch($recv){
+                    case \srv::SRV_SHUTDOWN:
+                    $this->stop();
+                    foreach($this->childs as $pid => $enbl)
+                    posix_kill($pid,9);
+                    $this->srv->stop();
+                }
+            }
         }
         $_SERVER['__IPC']->close();
         socket_close($this->socket);
@@ -102,7 +120,7 @@ class socket
     private function fork()
     {
         $pid = pcntl_fork();
-        if($pid != 0) return;
+        if($pid != 0) return $pid;
         $childpid = posix_getpid();
         slog("OK","Thread proccess started. pid:".$childpid);
         $count = 0;
