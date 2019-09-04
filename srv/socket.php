@@ -93,28 +93,54 @@ class socket
         pcntl_signal(SIGTERM,'sig_handler');
         $state = true;
         while($state){
+            usleep(1000);
+            $id = (file_exists($this->srv->getConf()['pid']))?posix_getpid():1;
+            $recv = $_SERVER['__IPC']->recv($id);
+            if(!empty($recv)){
+                switch($recv){
+                    case \srv::SRV_SHUTDOWN:
+                        print "Shutdown server...".PHP_EOL;
+                        $this->stop();
+                        $this->stopThreads();
+                        $this->srv->stop();
+                    break;
+                    case \srv::SRV_SHUTDOWN:
+                        $this->stop();
+                    break;
+                }
+            }
             $pid = pcntl_waitpid(-1,$status,WNOHANG);
             if($pid > 0){
                 unset($this->childs[$pid]);
                 $status = pcntl_wexitstatus($status);
-                slog("FAIL","Child ".$status." exited");
+                /*if($status != \srv::SRV_SHUTDOWN){
+                    $this->childs[$this->fork()] = true;
+                }*/
+                slog(($this->run)?"FAIL":"OK","Child ".$status." exited");
             }
             if(count($this->childs)==0) $state = false;
 
-            $recv = $_SERVER['__IPC']->recv();
-            if(!empty($recv)){
-                switch($recv){
-                    case \srv::SRV_SHUTDOWN:
-                    $this->stop();
-                    foreach($this->childs as $pid => $enbl)
-                    posix_kill($pid,9);
-                    $this->srv->stop();
-                }
-            }
+
         }
         $_SERVER['__IPC']->close();
         socket_close($this->socket);
-        slog("FAIL","Socket closed!");
+        slog(($this->run)?"FAIL":"OK","Socket closed!");
+    }
+
+    private function stopThreads()
+    {
+        reset($this->childs);
+        while(count($this->childs)>0){
+            usleep(50000);
+            $pid = key($this->childs);
+            $_SERVER['__IPC']->send($pid,\srv::SRV_SHUTDOWN);
+            $pidr = pcntl_waitpid($pid,$status,WNOHANG);
+            if($pidr>0){
+                slog("OK","Child ".$pidr." exited");
+                unset($this->childs[$pidr]);
+                reset($this->childs);
+            }
+        }
     }
 
     private function fork()
@@ -123,13 +149,24 @@ class socket
         if($pid != 0) return $pid;
         $childpid = posix_getpid();
         slog("OK","Thread proccess started. pid:".$childpid);
-        $count = 0;
         while ($this->run) {
+            usleep(5000);
             $connection = @socket_accept($this->socket);
-            while(pcntl_waitpid(0, $status, WNOHANG) != -1)
-                $status = pcntl_wexitstatus($status);
+            if(pcntl_waitpid(0, $status, WNOHANG) != -1) $status = pcntl_wexitstatus($status);
+            $__SIGNAL = $_SERVER['__IPC']->recv(posix_getpid());
+            if(!empty($__SIGNAL)){
+                switch($__SIGNAL){
+                    case \srv::SRV_SHUTDOWN:
+                        $this->stop();
+                        $this->srv->stop();
+                    break;
+                    case \srv::SRV_GRACEFUL:
+                        $this->stop();
+                        $this->srv->stop();
+                    break;
+                }
+            }
             if(!$connection) continue;
-            $count++;
             $content = "";
             $client = "";
             try{
@@ -150,7 +187,6 @@ class socket
                     continue;
                 }
                 socket_getpeername($connection,$ip);
-                print "[Num:".$count.",fork:".$childpid."]-->Request[".$ip."]".PHP_EOL;
                 $execute = new execute($this->srv,$client,$ip,$connection);
                 $content = $execute->getReturn();
                 unset($execute);
@@ -170,8 +206,17 @@ class socket
             $this->engine->send($connection,$content);
             socket_close($connection);
         }
-        exit();
-
+        $code = 0;
+        switch($__SIGNAL){
+            case \srv::SRV_SHUTDOWN:
+                $code = \srv::SRV_SHUTDOWN;
+            break;
+            case SRV_GRACEFUL:
+                $code = \srv::SRV_GRACEFUL;
+            default:
+                $code = 0;
+        }
+        exit($code);
     }
 
     private function openServerSocket()

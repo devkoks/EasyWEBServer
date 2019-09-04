@@ -6,7 +6,7 @@ class IPC
     private $lim    = 134217728;
     private $shm    = null;
     private $msg    = null;
-    private $blk    = 8;
+    private $blk    = 16;
 
 
     public function __construct($ftok=null)
@@ -15,11 +15,11 @@ class IPC
             $ftok = ftok(__FILE__,"t");
         $this->shm = shm_attach($ftok,$this->lim);
         shm_put_var($this->shm,0,[['def']]);
-        $this->msg = msg_get_queue(1,0444);
+        $this->msg = msg_get_queue(ftok(__FILE__,"s"),0444);
     }
     public function __destruct()
     {
-        $this->close();
+        //$this->close();
     }
     public function get($name)
     {
@@ -36,16 +36,11 @@ class IPC
     }
     public function send($type,$msg)
     {
-        msg_send($this->msg,$type,$msg);
+        msg_send($this->msg,$type,$msg,true,true,$err);
     }
-    public function recv()
+    public function recv($channel=0)
     {
-        $state = true;
-        $msg = "";
-        while($state){
-            $state = msg_receive($this->msg,0,$type,$this->blk,$message,true,MSG_IPC_NOWAIT,$err);
-            $msg .= $message;
-        }
+        msg_receive($this->msg,$channel,$type,$this->blk,$msg,true,MSG_IPC_NOWAIT,$err);
         return $msg;
     }
     public function close()

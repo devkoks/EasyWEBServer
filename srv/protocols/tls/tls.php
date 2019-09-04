@@ -75,7 +75,7 @@ class TLS
         socket_set_option($this->socket, SOL_SOCKET, SO_REUSEADDR, 1);
         socket_bind($this->socket, $this->__host, $this->__port);
         socket_listen($this->socket, 10);
-        socket_set_block($this->socket);
+        socket_set_nonblock($this->socket);
         return $this->socket;
     }
 

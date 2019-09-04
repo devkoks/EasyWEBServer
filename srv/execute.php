@@ -80,6 +80,11 @@ class execute
         $this->isBuffer = false;
     }
 
+    public function graceful()
+    {
+        
+    }
+
     public function setContent($content)
     {
         $this->__content = $content;

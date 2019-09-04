@@ -11,9 +11,11 @@ class srv
 {
     private $__conf = [];
     private $__args = [];
+    private $__stag = [];
     private $status = true;
 
     const SRV_SHUTDOWN = 9;
+    const SRV_GRACEFUL = 8;
 
     public function __construct()
     {
@@ -32,6 +34,12 @@ class srv
         include "srv/socket.php";
         include $this->__conf["start"]["dir"].$this->__conf["start"]["file"];
         slog("INFO","Starting web server...");
+        if(isset($this->__args['t'])) $this->__conf["threads"] = $this->__args['t'];
+        if(isset($this->__args['s'])) $this->__conf["protocol"] = $this->__args['s'];
+        if(isset($this->__args['c'])) $this->__conf["local_cert"] = $this->__args['c'];
+        if(isset($this->__args['h'])) $this->__conf["host"] = $this->__args['h'];
+        if(isset($this->__args['p'])) $this->__conf["port"] = $this->__args['p'];
+        file_put_contents($this->__conf['pid'],posix_getpid());
         while($this->status){
             $this->socket();
             //More...
@@ -53,11 +61,6 @@ class srv
         $socket->configure("local_cert",$this->__conf['tls']["cert"]);
         $socket->configure("host",$this->__conf["host"]);
         $socket->configure("port",$this->__conf["port"]);
-        if(isset($this->__args['t'])) $socket->configure("threads",$this->__args['t']);
-        if(isset($this->__args['s'])) $socket->configure("protocol",$this->__args['s']);
-        if(isset($this->__args['c'])) $socket->configure("local_cert",$this->__args['c']);
-        if(isset($this->__args['h'])) $socket->configure("host",$this->__args['h']);
-        if(isset($this->__args['p'])) $socket->configure("port",$this->__args['p']);
         $socket->start();
     }
 
@@ -69,12 +72,14 @@ if(isset($argv[1])){
             (pcntl_fork()==0) ? new srv() : exit();
         break;
         case "stop":
-            $msg = msg_get_queue(1,0444);
-            msg_send($msg,1,srv::SRV_SHUTDOWN);
+            $conf = include "srv/srv.conf.php";
+            $id = (file_exists($conf['pid']))?file_get_contents($conf['pid']):1;
+            $msg = msg_get_queue(ftok(__DIR__.'/srv/IPC.php','s'),0444);
+            msg_send($msg,$id,srv::SRV_SHUTDOWN);
         break;
         case "restart":
         break;
         default:
-            print "Unknown command: ".$argv[1].PHP_EOL;
+            new srv();
     }
 }
