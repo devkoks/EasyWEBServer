@@ -39,11 +39,13 @@ class srv
         if(isset($this->__args['c'])) $this->__conf["local_cert"] = $this->__args['c'];
         if(isset($this->__args['h'])) $this->__conf["host"] = $this->__args['h'];
         if(isset($this->__args['p'])) $this->__conf["port"] = $this->__args['p'];
+        if(isset($this->__args['P'])) $conf['pid'] = $args['P'];
         file_put_contents($this->__conf['pid'],posix_getpid());
         while($this->status){
             $this->socket();
             //More...
         }
+        if(file_exists($this->__conf['pid']))unlink($this->__conf['pid']);
     }
 
     public function stop()
@@ -73,6 +75,8 @@ if(isset($argv[1])){
         break;
         case "stop":
             $conf = include "srv/srv.conf.php";
+            $args = include "srv/arguments.php";
+            if(isset($args['P'])) $conf['pid'] = $args['P'];
             $id = (file_exists($conf['pid']))?file_get_contents($conf['pid']):1;
             $msg = msg_get_queue(ftok(__DIR__.'/srv/IPC.php','s'),0444);
             msg_send($msg,$id,srv::SRV_SHUTDOWN);
