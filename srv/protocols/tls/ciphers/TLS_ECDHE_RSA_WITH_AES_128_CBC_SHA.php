@@ -35,6 +35,8 @@ class TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
         $DHParams .= pack('C*',0x03,0x00,0x18);
         $DHParams .= TLS::getPackageSize($publicKey,1);
         $DHParams .= $publicKey;
+        if(strlen($DHParams)<101)
+            return $this->getDHParams();
         return $DHParams;
     }
     public function getDHSignature($clientRandom,$serverRandom,$DHParams,$privateKey)
