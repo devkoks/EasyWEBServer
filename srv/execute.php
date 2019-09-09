@@ -82,7 +82,7 @@ class execute
 
     public function graceful()
     {
-        
+
     }
 
     public function setContent($content)
@@ -223,6 +223,8 @@ class execute
     {
         if(!isset($this->__client["headers"]["Content-Type"])) return [];
         $files = [];
+        if($this->__client["headers"]["Content-Type"]!="multipart/form-data")
+            return [];
         $posts = $this->parseBoundaryContent($this->__client["headers"]["Content-Type"],$this->__client["body"]);
         foreach($posts as $name => $post){
             if(isset($post["headers"]["Content-Disposition"]["filename"])){
