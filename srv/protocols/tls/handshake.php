@@ -39,6 +39,10 @@ class Handshake
             case self::HEADER_CLIENTHELLO:
                 $this->clientHello($raw);
                 $this->changeCipher();
+                if($this->getCipher()==null){
+                    socket_write($this->connection,pack("C*",0x15,0x03,0x03,0x00,0x02,0x02,0x28));
+                    return;
+                }
                 $package  = $this->serverHello();
                 $package .= $this->certificates();
                 $package .= $this->serverKeyExchange();
@@ -85,6 +89,8 @@ class Handshake
         $handshakeCompression = substr($raw,$i,2);$i+=2;
         $handshake['compression'] = unpack("H*",$handshakeCompression)[1];
         $handshakeExtensionsLength = substr($raw,$i,2);$i+=2;
+        $this->client = $handshake;
+        if(empty($handshakeExtensionsLength)) return $handshake;
         $handshake['extensions-length'] = hexdec(unpack("H4",$handshakeExtensionsLength)[1]);
         $handshakeExtensions = $handshakeCompression = substr($raw,$i,$handshake['extensions-length']);$i+=$handshake['extensions-length'];
         $handshake['extensions'] = $this->parseHandshakeExtensions($handshakeExtensions);
