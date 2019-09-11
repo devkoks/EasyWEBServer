@@ -1,7 +1,7 @@
 <?php
 return [
     "server-root"=>"/usr/local/libdata/phpwebsrv",
-    "pid"=>"server.pid",
+    "pid"=>"serverd.pid",
     "host"=>"0.0.0.0",
     "port"=>10443,
     "protocol"=>"tls",
