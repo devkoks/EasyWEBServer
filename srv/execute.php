@@ -223,7 +223,7 @@ class execute
     {
         if(!isset($this->__client["headers"]["Content-Type"])) return [];
         $files = [];
-        if($this->__client["headers"]["Content-Type"]=="application/x-www-form-urlencoded")
+        if($this->__client["headers"]["Content-Type"]=="application/x-www-form-urlencoded; charset=UTF-8")
             return [];
         $posts = $this->parseBoundaryContent($this->__client["headers"]["Content-Type"],$this->__client["body"]);
         foreach($posts as $name => $post){
