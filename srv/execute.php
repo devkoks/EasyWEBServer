@@ -38,7 +38,7 @@ class execute
                 $f=fopen($dir,"r");
                 $this->__content = fread($f,$size);
                 fclose($f);
-                /*$ETag = md5($this->__content);
+                $ETag = md5($this->__content);
                 $this->header("Date: ".date("r"));
                 $this->header("ETag: ".$ETag);
                 if(isset($this->__client["headers"]["If-None-Match"])){
@@ -52,7 +52,7 @@ class execute
                 }else{
                     $this->header("Accept-Ranges: bytes");
                     $this->header("Content-Length: ".strlen($this->__content));
-                }*/
+                }
             }
             unset($size,$dir,$f);
         }
@@ -223,7 +223,7 @@ class execute
     {
         if(!isset($this->__client["headers"]["Content-Type"])) return [];
         $files = [];
-        if($this->__client["headers"]["Content-Type"]!="multipart/form-data")
+        if($this->__client["headers"]["Content-Type"]=="application/x-www-form-urlencoded")
             return [];
         $posts = $this->parseBoundaryContent($this->__client["headers"]["Content-Type"],$this->__client["body"]);
         foreach($posts as $name => $post){
