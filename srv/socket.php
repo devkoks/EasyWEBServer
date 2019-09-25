@@ -119,8 +119,6 @@ class socket
                 slog(($this->run)?"FAIL":"OK","Child ".$status." exited");
             }
             if(count($this->childs)==0) $state = false;
-
-
         }
         $_SERVER['__IPC']->close();
         socket_close($this->socket);
@@ -167,44 +165,15 @@ class socket
                 }
             }
             if(!$connection) continue;
-            $content = "";
-            $client = "";
-            try{
-                if(method_exists($this->engine,"prepareConnection"))
-                    $this->engine->prepareConnection($connection);
-                $headers = $this->engine->getHeaders($connection);
-                $client .= $headers."\r\n\r\n";
-                $headers = execute::parseHeaders($headers);
-                if(count($headers)==0){
-                    socket_close($connection);
-                    continue;
-                }
-                if(isset($headers["Content-Length"]) && $headers["Content-Length"]>0)
-                    $client .= $this->engine->getBody($connection,$headers["Content-Length"]);
-                if($client === false){
-                    if(get_resource_type($connection)=="Socket")
-                        socket_close($connection);
-                    continue;
-                }
-                socket_getpeername($connection,$ip);
-                $execute = new execute($this->srv,$client,$ip,$connection);
-                $content = $execute->getReturn();
-                unset($execute);
-            }catch(Exception $e){
-                slog("ERROR",$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine().
-                PHP_EOL.
-                $e->getTraceAsString());
-            }catch(Error $e){
-                slog("ERROR",$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine().
-                PHP_EOL.
-                $e->getTraceAsString());
-            }catch(ErrorException $e){
-                slog("ERROR",$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine().
-                PHP_EOL.
-                $e->getTraceAsString());
+            $proccess = pcntl_fork();
+            if($proccess == 0){
+                $this->connection($connection);
+                exit(1);
+            }else{
+                pcntl_waitpid($proccess,$status);
+                pcntl_wexitstatus($status);
+                socket_close($connection);
             }
-            $this->engine->send($connection,$content);
-            socket_close($connection);
         }
         $code = 0;
         switch($__SIGNAL){
@@ -217,6 +186,47 @@ class socket
                 $code = 0;
         }
         exit($code);
+    }
+    private function connection($connection)
+    {
+        $content = "";
+        $client = "";
+        try{
+            if(method_exists($this->engine,"prepareConnection"))
+                $this->engine->prepareConnection($connection);
+            $headers = $this->engine->getHeaders($connection);
+            $client .= $headers."\r\n\r\n";
+            $headers = execute::parseHeaders($headers);
+            if(count($headers)==0){
+                socket_close($connection);
+                return false;
+            }
+            if(isset($headers["Content-Length"]) && $headers["Content-Length"]>0)
+                $client .= $this->engine->getBody($connection,$headers["Content-Length"]);
+            if($client === false){
+                if(get_resource_type($connection)=="Socket")
+                    socket_close($connection);
+                return false;
+            }
+            socket_getpeername($connection,$ip);
+            $execute = new execute($this->srv,$client,$ip,$connection);
+            $content = $execute->getReturn();
+            unset($execute);
+        }catch(Exception $e){
+            slog("ERROR",$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine().
+            PHP_EOL.
+            $e->getTraceAsString());
+        }catch(Error $e){
+            slog("ERROR",$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine().
+            PHP_EOL.
+            $e->getTraceAsString());
+        }catch(ErrorException $e){
+            slog("ERROR",$e->getMessage()." in ".$e->getFile()." on line ".$e->getLine().
+            PHP_EOL.
+            $e->getTraceAsString());
+        }
+        $this->engine->send($connection,$content);
+        return true;
     }
 
     private function openServerSocket()
