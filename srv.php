@@ -31,6 +31,7 @@ class srv
         include "srv/log.php";
         include "srv/IPC.php";
         include "srv/execute.php";
+        include "srv/Events.php";
         include "srv/socket.php";
         include $this->__conf["start"]["dir"].$this->__conf["start"]["file"];
         slog("INFO","Starting web server...");

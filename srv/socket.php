@@ -86,6 +86,7 @@ class socket
 
 
         $_SERVER['__IPC'] = new IPC();
+        $_SERVER['__EVENTS'] = new Events();
         for($i = 0; $i < $this->__threads; $i++){
             $this->childs[$this->fork()] = true;
         }
@@ -164,6 +165,7 @@ class socket
                     break;
                 }
             }
+            $_SERVER['__EVENTS']->execute();
             if(!$connection) continue;
             $proccess = pcntl_fork();
             if($proccess == 0){
