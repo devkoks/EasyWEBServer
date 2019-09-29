@@ -165,7 +165,7 @@ class socket
                     break;
                 }
             }
-            $_SERVER['__EVENTS']->execute();
+            //$_SERVER['__EVENTS']->execute();
             if(!$connection) continue;
             $proccess = pcntl_fork();
             if($proccess == 0){
