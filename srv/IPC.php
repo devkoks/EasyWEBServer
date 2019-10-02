@@ -11,20 +11,21 @@ class IPC
 
     public function __construct($name=null)
     {
-        print "Pre attach".PHP_EOL;
-        $this->shm = posix_shm_attach("easywebserver4",128000);
-        print "Post attach".PHP_EOL;
-        if($this->shm == false)
-            throw new \Exception("Error allocate shared memory", 1);
-        print "Pre write".PHP_EOL;
-        //$this->close();
-        //exit();
-        $st = posix_shm_write($this->shm,serialize([]));
-        if($st == false){
+        slog("INFO","Check shared memory...");
+        $this->shm = posix_shm_attach("easywebserver7",$this->lim);
+        if($this->shm == false){
+            slog("ERROR","Error allocate \"".$this->lim."\" bytes shared memory");
             exit();
         }
-        print "Post write".PHP_EOL;
+        $st = posix_shm_write($this->shm,serialize([]));
+        if($st == false){
+            slog("ERROR","Shared memory is not writeable");
+            exit();
+        }
+        slog("OK","Shared memory is ready");
+        slog("INFO","Initialization IPC messages...");
         $this->msg = msg_get_queue(ftok(__FILE__,"s"),0444);
+        slog("OK","IPC messages is ready");
     }
     public function __destruct()
     {
@@ -39,7 +40,7 @@ class IPC
     {
         $mem = unserialize(posix_shm_read($this->shm));
         $mem[$name] = serialize($var);
-        posix_shm_write($this->shm,serialize($mem));
+        return posix_shm_write($this->shm,serialize($mem));
     }
     public function isset($name)
     {
@@ -48,7 +49,7 @@ class IPC
     }
     public function send($type,$msg)
     {
-        msg_send($this->msg,$type,$msg,true,true,$err);
+        return msg_send($this->msg,$type,$msg,true,true,$err);
     }
     public function recv($channel=0)
     {
@@ -59,6 +60,8 @@ class IPC
     {
         if(get_resource_type($this->shm)!="POSIX shared memory") return;
         posix_shm_close($this->shm);
+        slog("OK","Shared memory closed");
         msg_remove_queue($this->msg);
+        slog("OK","IPC messages queue removed");
     }
 }
