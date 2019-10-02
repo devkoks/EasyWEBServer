@@ -113,6 +113,7 @@ class execute
         $class = $this->conf["start"]["class"];
         $method = $this->conf["start"]["method"];
         $data = $this->server();
+        $data['SERVER']['__EVENTS'] = $_SERVER['__EVENTS'];
         $data['SERVER']['__IPC'] = $_SERVER['__IPC'];
         $LOGS_ENABLED = $_SERVER["LOGS_ENABLE"];
         $_SERVER = $data['SERVER'];

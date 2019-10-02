@@ -6,69 +6,105 @@ class Events
 
     public function __construct()
     {
-        $_SERVER['__IPC']->set('__EVENTS__',$this->events);
+        if(!$_SERVER['__IPC']->isset('__EVENTS__'))
+            $_SERVER['__IPC']->set('__EVENTS__',[]);
     }
 
-    public function add($name, $event, $thread=false)
+    public function add($name, $path, $start=[])
     {
-        $this->events = $_SERVER['__IPC']->get('__EVENTS__',$this->events);
-        $this->events[$name] = [
-            'execute'=>$event,
+        $thread = true;
+        $events = $_SERVER['__IPC']->get('__EVENTS__');
+        $events[$name] = [
+            'name'=>$name,
+            'execute'=>[
+                'path'=>$path,
+                'object'=>$start['object'],
+                'method'=>$start['method'],
+                'params'=>$start['params']
+            ],
             'thread'=>$thread,
             'type'=>0,
             'timer'=>0,
             'last'=>0
         ];
-        $_SERVER['__IPC']->set('__EVENTS__',$this->events);
+        $_SERVER['__IPC']->set('__EVENTS__',$events);
         return true;
     }
 
     public function addTimer($name,$time,$isPeriodic=true)
     {
-        $this->events = $_SERVER['__IPC']->get('__EVENTS__',$this->events);
-        $this->events[$name]['type']  = ($isPeriodic)?0:1;
-        $this->events[$name]['timer'] = $time;
-        $_SERVER['__IPC']->set('__EVENTS__',$this->events);
+        $events = $_SERVER['__IPC']->get('__EVENTS__');
+        $events[$name]['type']  = ($isPeriodic)?1:0;
+        $events[$name]['timer'] = $time;
+        if(!$isPeriodic and $time<time())
+            $events[$name]['timer']=$time+time();
+
+        if($isPeriodic)
+            $events[$name]['last'] = time();
+        $_SERVER['__IPC']->set('__EVENTS__',$events);
         return true;
     }
 
     public function get($name)
     {
-        $this->events = $_SERVER['__IPC']->get('__EVENTS__',$this->events);
-        if(!isset($this->events[$name]))
+        $events = $_SERVER['__IPC']->get('__EVENTS__');
+        if(!isset($events[$name]))
             return null;
-        return $this->events[$name];
+        return $events[$name];
     }
 
     public function remove($name)
     {
-        $_SERVER['__IPC']->get('__EVENTS__',$this->events);
-        unset($this->events[$name]);
-        $_SERVER['__IPC']->set('__EVENTS__',$this->events);
+        $events = $_SERVER['__IPC']->get('__EVENTS__');
+        unset($events[$name]);
+        $_SERVER['__IPC']->set('__EVENTS__',$events);
         return true;
     }
 
     public function execute()
     {
-        $pid = pcntl_fork();
-        if($pid != 0) return;
-        $this->events = $_SERVER['__IPC']->get('__EVENTS__',$this->events);
-        foreach($this->events as $name => $event){
-            $execute = $event['execute'];
-            if($event['thread'])
-                $pid = pcntl_fork();
-            if($pid != 0) return;
-            if($event['type']==0&&$event['timer']==0)
-                $execute();
-            if($event['type']==0&&$event['timer']>0&&(time()-$event['last']>$event['timer']))
-                $execute();
-            if($event['type']==1&&(time()>=$event['timer']))
-                $execute();
-            $this->events = $_SERVER['__IPC']->get('__EVENTS__',$this->events);
-            $this->events[$name]['last'] = time();
-            $_SERVER['__IPC']->set('__EVENTS__',$this->events);
-            if($event['thread']) exit();
+        $events = $_SERVER['__IPC']->get('__EVENTS__');
+        foreach($events as $name => $event){
+            $executed = false;
+            if($event['type']==1&&(time()-$event['last']>=$event['timer']))
+                $executed = $this->run($event);
+            if($event['type']==0&&(time()>=$event['timer']))
+                $executed = $this->run($event);
+            if($executed)
+                $events[$name]['last'] = time();
         }
-        exit();
+        $_SERVER['__IPC']->set('__EVENTS__',$events);
+    }
+
+    private function run($event)
+    {
+        if($event['thread']) $pid = pcntl_fork();
+        if($pid != 0) return true;
+        if(!file_exists($event['execute']['path'])){
+            slog("ERROR","Event \"".$event['name']."\" file \"".$event['execute']['path']."\" not exists");
+            slog("INFO","Remove \"".$event['name']."\" event");
+            $this->remove($event['name']);
+            return false;
+        }
+        include $event['execute']['path'];
+        if($event['execute']['object']!=null and !class_exists($event['execute']['object'],false)){
+            slog("ERROR","Event \"".$event['name']."\" class \"".$event['execute']['object']."\" not fount in file \"".$event['execute']['path']."\"");
+            slog("INFO","Remove \"".$event['name']."\" event");
+            $this->remove($event['name']);
+            return false;
+        }
+        $execute = new $event['execute']['object']();
+        if($event['execute']['method']!=null and !method_exists($execute,$event['execute']['method'])){
+            slog("ERROR","Event \"".$event['name']."\" method \"".$event['execute']['method']."\" not fount in file \"".$event['execute']['path']."\"");
+            slog("INFO","Remove \"".$event['name']."\" event");
+            $this->remove($event['name']);
+            return false;
+        }
+        if($event['type']==0)
+            $this->remove($event['name']);
+        //var_dump($event['execute']['params']);
+        call_user_func_array([$execute,$event['execute']['method']],$event['execute']['params']);
+
+        if($event['thread']) exit(\srv::SRV_ESUCCESS);
     }
 }

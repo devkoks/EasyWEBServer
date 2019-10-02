@@ -94,7 +94,8 @@ class socket
         pcntl_signal(SIGTERM,'sig_handler');
         $state = true;
         while($state){
-            usleep(1000);
+            usleep(50000);
+            $_SERVER['__EVENTS']->execute();
             $id = (file_exists($this->srv->getConf()['pid']))?posix_getpid():1;
             $recv = $_SERVER['__IPC']->recv($id);
             if(!empty($recv)){
@@ -117,7 +118,8 @@ class socket
                 /*if($status != \srv::SRV_SHUTDOWN){
                     $this->childs[$this->fork()] = true;
                 }*/
-                slog(($this->run)?"FAIL":"OK","Child ".$status." exited");
+                if($status!=\srv::SRV_ESUCCESS)
+                    slog(($status!=\srv::SRV_SHUTDOWN)?"FAIL":"OK","Child ".$status." exited");
             }
             if(count($this->childs)==0) $state = false;
         }
@@ -130,7 +132,7 @@ class socket
     {
         reset($this->childs);
         while(count($this->childs)>0){
-            usleep(50000);
+            usleep(10000);
             $pid = key($this->childs);
             $_SERVER['__IPC']->send($pid,\srv::SRV_SHUTDOWN);
             $pidr = pcntl_waitpid($pid,$status,WNOHANG);
@@ -165,7 +167,6 @@ class socket
                     break;
                 }
             }
-            //$_SERVER['__EVENTS']->execute();
             if(!$connection) continue;
             $proccess = pcntl_fork();
             if($proccess == 0){
