@@ -14,8 +14,9 @@ class srv
     private $__stag = [];
     private $status = true;
 
-    const SRV_SHUTDOWN = 9;
     const SRV_GRACEFUL = 8;
+    const SRV_SHUTDOWN = 9;
+    const SRV_ESUCCESS = 23;
 
     public function __construct()
     {
