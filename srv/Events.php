@@ -84,21 +84,21 @@ class Events
             slog("ERROR","Event \"".$event['name']."\" file \"".$event['execute']['path']."\" not exists");
             slog("INFO","Remove \"".$event['name']."\" event");
             $this->remove($event['name']);
-            return false;
+            if($event['thread']) exit(\srv::SRV_ESUCCESS);
         }
         include $event['execute']['path'];
         if($event['execute']['object']!=null and !class_exists($event['execute']['object'],false)){
             slog("ERROR","Event \"".$event['name']."\" class \"".$event['execute']['object']."\" not fount in file \"".$event['execute']['path']."\"");
             slog("INFO","Remove \"".$event['name']."\" event");
             $this->remove($event['name']);
-            return false;
+            if($event['thread']) exit(\srv::SRV_ESUCCESS);
         }
         $execute = new $event['execute']['object']();
         if($event['execute']['method']!=null and !method_exists($execute,$event['execute']['method'])){
             slog("ERROR","Event \"".$event['name']."\" method \"".$event['execute']['method']."\" not fount in file \"".$event['execute']['path']."\"");
             slog("INFO","Remove \"".$event['name']."\" event");
             $this->remove($event['name']);
-            return false;
+            if($event['thread']) exit(\srv::SRV_ESUCCESS);
         }
         if($event['type']==0)
             $this->remove($event['name']);
