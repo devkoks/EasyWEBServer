@@ -70,10 +70,11 @@ class Events
                 $executed = $this->run($event);
             if($event['type']==0&&(time()>=$event['timer']))
                 $executed = $this->run($event);
-            if($executed)
+            if($executed){
                 $events[$name]['last'] = time();
+                $_SERVER['__IPC']->set('__EVENTS__',$events);
+            }
         }
-        $_SERVER['__IPC']->set('__EVENTS__',$events);
     }
 
     private function run($event)
@@ -86,7 +87,7 @@ class Events
             $this->remove($event['name']);
             if($event['thread']) exit(\srv::SRV_ESUCCESS);
         }
-        include $event['execute']['path'];
+        require_once $event['execute']['path'];
         if($event['execute']['object']!=null and !class_exists($event['execute']['object'],false)){
             slog("ERROR","Event \"".$event['name']."\" class \"".$event['execute']['object']."\" not fount in file \"".$event['execute']['path']."\"");
             slog("INFO","Remove \"".$event['name']."\" event");
@@ -102,7 +103,6 @@ class Events
         }
         if($event['type']==0)
             $this->remove($event['name']);
-        //var_dump($event['execute']['params']);
         call_user_func_array([$execute,$event['execute']['method']],$event['execute']['params']);
 
         if($event['thread']) exit(\srv::SRV_ESUCCESS);
