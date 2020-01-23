@@ -14,7 +14,7 @@ PHP version >= 7.2
 # Variables
 
 ## $_SERVER
-
+Server and execution environment information.
 ```php
 Array (
 	"SERVER_NAME"=>"syfy-host.com",
@@ -32,6 +32,27 @@ Array (
 	"__EVENTS"=>Object(__EVENTS)
 )
 ```
+## $_POST
+HTTP POST variables.
+An associative array of variables passed to the current script via the HTTP POST method when using _application/x-www-form-urlencoded_ or _multipart/form-data_ as the HTTP Content-Type in the request.
+```php
+Array (
+	"key"=>"value",
+	"bar"=>"foo"
+)
+```
+
+## $_GET
+HTTP GET variables.
+An associative array of variables passed to the current script via the URL parameters (aka. query string). Note that the array is not only populated for GET requests, but rather for all requests with a query string.
+```php
+Array (
+	"key"=>"value",
+	"bar"=>"foo"
+)
+```
+
+
 # Server objects
 ## __SRV
 ### setContent( string $content ) : void
@@ -124,22 +145,4 @@ Remove event
 Example:
 ```php
 $_SERVER['__EVENTS']->remove('bar');
-```
-
-## $_POST
-Default POST variable...
-```php
-Array (
-	"key"=>"value",
-	"bar"=>"foo"
-)
-```
-
-## $_GET
-Default GET variable...
-```php
-Array (
-	"key"=>"value",
-	"bar"=>"foo"
-)
 ```
