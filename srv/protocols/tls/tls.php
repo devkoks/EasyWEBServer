@@ -56,6 +56,10 @@ class TLS
                 zfs_unmount($this->conf['tls']['auto-create-cert']['zfs']['dataset']);
                 break;
             }
+            if(!file_exists(dirname($this->conf['tls']['auto-create-cert']['fs']['key-path'])))
+                    mkdir(dirname($this->conf['tls']['auto-create-cert']['fs']['key-path']),0644,true);
+            if(!file_exists(dirname($this->conf['tls']['auto-create-cert']['fs']['cert-path'])))
+                    mkdir(dirname($this->conf['tls']['auto-create-cert']['fs']['cert-path']),0644,true);
             $fpriv = fopen($this->conf['tls']['auto-create-cert']['fs']['key-path'],'w');
             $fcert = fopen($this->conf['tls']['auto-create-cert']['fs']['cert-path'],'w');
             fwrite($fpriv, $keyOut);
