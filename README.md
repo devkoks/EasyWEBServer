@@ -146,3 +146,4 @@ Example:
 ```php
 $_SERVER['__EVENTS']->remove('bar');
 ```
+
