@@ -176,7 +176,8 @@ class execute
         if(!isset($this->__client["headers"]["Content-Type"])) return [];
         switch(explode(";",$this->__client["headers"]["Content-Type"])[0]){
             case "application/x-www-form-urlencoded":
-                return $this->parseUrlQuery($this->__client["body"]);
+            	parse_str($this->__client["body"],$body);
+                return $body;
             break;
             case "text/plain":
                 return [$this->__client["body"]];
