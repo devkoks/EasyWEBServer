@@ -167,10 +167,8 @@ class execute
 
     private function parseUrlQuery($url)
     {
-        $GET = urldecode(parse_url($url,PHP_URL_QUERY));
-        if(empty($GET)){
-            parse_str($url,$GET);
-        }
+        $url = urldecode(parse_url($url,PHP_URL_QUERY));
+        parse_str($url,$GET);
         return $GET;
     }
     private function post()
