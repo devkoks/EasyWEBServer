@@ -7,7 +7,7 @@ class execute
     private $__content = "";
     private $__client  = [];
 
-    private $isBuffer = false;
+    private $isBuffer = true;
     private $context;
     private $connection;
     private $conf;
@@ -33,7 +33,10 @@ class execute
             $dir = $this->conf["start"]["dir"].urldecode(parse_url($this->__url,PHP_URL_PATH));
             if(!file_exists($dir)) $dir = $this->conf["error-page"]["404"];
             $this->header("Content-type: ".$this->select());
-            $size = filesize($dir);
+            if(file_exists($dir))
+           		$size = filesize($dir);
+          	else
+              	$size = 0;
             if($size!=0){
                 $f=fopen($dir,"r");
                 $this->__content = fread($f,$size);
