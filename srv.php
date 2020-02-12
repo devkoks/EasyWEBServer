@@ -28,6 +28,7 @@ class srv
 
         $_SERVER["CONF"] = $this->__conf;
         $_SERVER["LOGS_ENABLE"] = false;
+      	error_reporting($this->__conf['error_reporting']);
         if(isset($this->__args['d'])) $_SERVER["LOGS_ENABLE"] = true;
         include "srv/log.php";
         include "srv/IPC.php";
