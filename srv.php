@@ -42,7 +42,7 @@ class srv
         if(isset($this->__args['c'])) $this->__conf["local_cert"] = $this->__args['c'];
         if(isset($this->__args['h'])) $this->__conf["host"] = $this->__args['h'];
         if(isset($this->__args['p'])) $this->__conf["port"] = $this->__args['p'];
-        if(isset($this->__args['P'])) $conf['pid'] = $args['P'];
+        if(isset($this->__args['P'])) $this->__conf['pid'] = $args['P'];
         file_put_contents($this->__conf['pid'],posix_getpid());
         while($this->status){
             $this->socket();
