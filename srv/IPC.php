@@ -12,12 +12,13 @@ class IPC
     public function __construct($name=null)
     {
         slog("INFO","Check shared memory...");
-        $this->shm = posix_shm_attach("easywebserver7",$this->lim);
+        $this->shm = shm_attach(1,$this->lim);
+
         if($this->shm == false){
             slog("ERROR","Error allocate \"".$this->lim."\" bytes shared memory");
             exit();
         }
-        $st = posix_shm_write($this->shm,serialize([]));
+        $st = shm_put_var($this->shm,0,serialize([]));
         if($st == false){
             slog("ERROR","Shared memory is not writeable");
             exit();
@@ -34,17 +35,17 @@ class IPC
     public function get($name)
     {
         if(!$this->isset($name)) return null;
-        return unserialize(unserialize(posix_shm_read($this->shm))[$name]);
+        return unserialize(unserialize(shm_get_var($this->shm,0))[$name]);
     }
     public function set($name, $var)
     {
-        $mem = unserialize(posix_shm_read($this->shm));
+        $mem = unserialize(shm_get_var($this->shm,0));
         $mem[$name] = serialize($var);
-        return posix_shm_write($this->shm,serialize($mem));
+        return shm_put_var($this->shm,0,serialize($mem));
     }
     public function isset($name)
     {
-        $mem = unserialize(posix_shm_read($this->shm));
+        $mem = unserialize(shm_get_var($this->shm,0));
         return isset($mem[$name]);
     }
     public function send($type,$msg)
@@ -58,8 +59,8 @@ class IPC
     }
     public function close()
     {
-        if(get_resource_type($this->shm)!="POSIX shared memory") return;
-        posix_shm_close($this->shm);
+        //if(get_resource_type($this->shm)!="POSIX shared memory") return;
+        shm_detach($this->shm);
         slog("OK","Shared memory closed");
         msg_remove_queue($this->msg);
         slog("OK","IPC messages queue removed");

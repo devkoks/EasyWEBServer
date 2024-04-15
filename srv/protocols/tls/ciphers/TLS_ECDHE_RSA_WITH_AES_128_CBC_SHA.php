@@ -81,7 +81,7 @@ class TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA
 
 	public function getPreMasterSecret($public)
 	{
-        return openssl_ecdh_compute_key($public,$this->dh);
+        return openssl_dh_compute_key($public,$this->dh);
 	}
     public function getMasterSecret($clientRandom,$serverRandom,$preMasterSecret)
     {

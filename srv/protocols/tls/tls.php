@@ -32,36 +32,13 @@ class TLS
             openssl_pkey_export($privateKey,$keyOut);
             $x509 = openssl_csr_sign($csr, null, $privateKey, 3600, ['digest_alg' => 'sha256', 'x509_extensions' => 'v3_ca'],time());
             openssl_x509_export($x509, $crtOut);
-            switch($this->conf['tls']['auto-create-cert']['generate-type']){
-                case "zfs":
-                zfs_mount($this->conf['tls']['auto-create-cert']['zfs']['dataset']);
-                $zroot = zfs_ds_list(['mountpoint']);
-                $zroot = $zroot[$this->conf['tls']['auto-create-cert']['zfs']['dataset']]['mountpoint'];
-                if(!file_exists(dirname("/etc".$this->conf['tls']['auto-create-cert']['zfs']['key-path'])))
-                    mkdir(dirname("/etc".$this->conf['tls']['auto-create-cert']['zfs']['key-path']),0600,true);
-                if(!file_exists(dirname("/etc".$this->conf['tls']['auto-create-cert']['zfs']['cert-path'])))
-                    mkdir(dirname("/etc".$this->conf['tls']['auto-create-cert']['zfs']['cert-path']),0600,true);
-                $fpriv = fopen("/etc".$this->conf['tls']['auto-create-cert']['zfs']['key-path'],'w');
-                $fcert = fopen("/etc".$this->conf['tls']['auto-create-cert']['zfs']['cert-path'],'w');
-                fwrite($fpriv, $keyOut);
-                fwrite($fcert, $crtOut);
-                fclose($fpriv);
-                fclose($fcert);
-                if(!file_exists(dirname($zroot.$this->conf['tls']['auto-create-cert']['zfs']['key-path'])))
-                    mkdir(dirname($zroot.$this->conf['tls']['auto-create-cert']['zfs']['key-path']),0600,true);
-                if(!file_exists(dirname($zroot.$this->conf['tls']['auto-create-cert']['zfs']['cert-path'])))
-                    mkdir(dirname($zroot.$this->conf['tls']['auto-create-cert']['zfs']['cert-path']),0600,true);
-                copy("/etc".$this->conf['tls']['auto-create-cert']['zfs']['key-path'],$zroot.$this->conf['tls']['auto-create-cert']['zfs']['key-path']);
-                copy("/etc".$this->conf['tls']['auto-create-cert']['zfs']['cert-path'],$zroot.$this->conf['tls']['auto-create-cert']['zfs']['cert-path']);
-                zfs_unmount($this->conf['tls']['auto-create-cert']['zfs']['dataset']);
-                break;
-            }
-            if(!file_exists(dirname($this->conf['tls']['auto-create-cert']['fs']['key-path'])))
-                    mkdir(dirname($this->conf['tls']['auto-create-cert']['fs']['key-path']),0644,true);
-            if(!file_exists(dirname($this->conf['tls']['auto-create-cert']['fs']['cert-path'])))
-                    mkdir(dirname($this->conf['tls']['auto-create-cert']['fs']['cert-path']),0644,true);
-            $fpriv = fopen($this->conf['tls']['auto-create-cert']['fs']['key-path'],'w');
-            $fcert = fopen($this->conf['tls']['auto-create-cert']['fs']['cert-path'],'w');
+
+            if(!file_exists(dirname($this->conf['tls']['auto-create-cert']['key-path'])))
+                    mkdir(dirname($this->conf['tls']['auto-create-cert']['key-path']),0644,true);
+            if(!file_exists(dirname($this->conf['tls']['auto-create-cert']['cert-path'])))
+                    mkdir(dirname($this->conf['tls']['auto-create-cert']['cert-path']),0644,true);
+            $fpriv = fopen($this->conf['tls']['auto-create-cert']['key-path'],'w');
+            $fcert = fopen($this->conf['tls']['auto-create-cert']['cert-path'],'w');
             fwrite($fpriv, $keyOut);
             fwrite($fcert, $crtOut);
             fclose($fpriv);
@@ -192,7 +169,7 @@ class TLS
         }
     }
 
-    public static function getRecordPackage($type=0x16,$record)
+    public static function getRecordPackage($type=0x16,$record=null)
     {
         $package = pack("C*",$type,0x03,0x03);
         $package .= self::getPackageSize($record,2);

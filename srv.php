@@ -1,8 +1,9 @@
 #!/usr/bin/php
 <?php
 declare(ticks = 1);
+
 function shutdown($socket=null){
-    @socket_close($socket);
+    //@socket_close($socket);
 }
 function sig_handler(){
     exit;

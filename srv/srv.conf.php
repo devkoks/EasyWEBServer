@@ -1,19 +1,19 @@
 <?php
 return [
-    "server-root"=>"/usr/local/libdata/phpwebsrv",
+    "server-root"=>dirname(dirname(__FILE__)),
     "pid"=>"server.pid",
     "host"=>"0.0.0.0",
     "port"=>10443,
-    "protocol"=>"tls",
+    "protocol"=>"tcp",
     "threads"=>6,
     "start"=>[
-        "dir"=>"/usr/local/www/billing",
+        "dir"=>'data',
         "file"=>"/index.php",
         "class"=>"index",
         "method"=>"init"
     ],
-  	"error_reporting"=>0,
-    "logs"=>'/var/log/easywebserver',
+  	"error_reporting"=>E_ALL,
+    "logs"=>'../logs.log',
     "max-connections"=>1000,
     "max-timeout-connections"=>1,
     "time-to-restart"=>[30,300],
@@ -21,19 +21,11 @@ return [
     "tls"=>[
         "auto-create-cert"=>[
             "enabled"=>true,
-            "generate-type"=>"zfs",
-            "zfs"=>[
-                "dataset"=>"data/cfg",
-                "cert-path"=>"/easywebserver/tls/default.crt",
-                "key-path"=>"/easywebserver/tls/default.key"
-            ],
-            "fs"=>[
-                "cert-path"=>"/usr/local/etc/phpwebsrv/easywebserver/tls/default.crt",
-                "key-path"=>"/usr/local/etc/phpwebsrv/easywebserver/tls/default.key"
-            ]
+            "cert-path"=>dirname(dirname(__FILE__))."/tls/default.crt",
+            "key-path"=>dirname(dirname(__FILE__))."/tls/default.key"
         ],
-        "cert"=>"/usr/local/etc/phpwebsrv/tls/default.crt",
-        "priv"=>"/usr/local/etc/phpwebsrv/tls/default.key"
+        "cert"=>dirname(dirname(__FILE__))."/tls/default.crt",
+        "priv"=>dirname(dirname(__FILE__))."/tls/default.key"
     ],
     "mime-types"=>[
         '*' => 'application/x-httpd-php',
@@ -108,8 +100,8 @@ return [
         '7z' => 'application/x-7z-compressed'
     ],
     "error-page"=>[
-        "404"=>"/usr/local/libdata/phpwebsrv/error-pages/404.html",
-        "500"=>"/usr/local/libdata/phpwebsrv/error-pages/500.html",
-        "503"=>"/usr/local/libdata/phpwebsrv/error-pages/503.html"
+        "404"=>"../error-pages/404.html",
+        "500"=>"../error-pages/500.html",
+        "503"=>"../error-pages/503.html"
     ]
 ];

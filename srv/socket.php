@@ -16,6 +16,7 @@ class socket
     public $run         = true;
 
     public $srv         = null;
+    public $engine      = null;
     private $socket     = null;
 
     private $childs     = [];

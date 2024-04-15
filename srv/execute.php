@@ -23,6 +23,7 @@ class execute
         $this->__client["content"] = $client;
         $this->__client["addr"] = $ip;
 
+        $this->prepareEnv();
         $this->parseClientContent();
         $this->status(200,'OK');
         $this->header("Server: EasyServer 0.1");
@@ -148,13 +149,15 @@ class execute
     {
         return [
             "SERVER"=>[
-                //"LOCAL_PORT"=>$this->context->__port,
+                "SERVER_PORT"=>$this->context->getConf()['port'],
                 "SERVER_NAME"=>$this->__client['headers']["Host"],
                 "REMOTE_ADDR"=>$this->__client["addr"],
                 "PROTOCOL"=>$this->__client["protocol"],
                 "REQUEST_TYPE"=>$this->__client["request-type"],
+                "REQUEST_METHOD"=>$this->__client["request-type"],
                 "REQUEST_URI"=>$this->__url,
                 "REQUEST_TIME"=>time(),
+                "DOCUMENT_ROOT"=>$this->context->getConf()['start']['dir'],
                 "HTTP_HEADERS"=>$this->__client["headers"]
             ],
             "CLIENT"=>[
@@ -166,6 +169,19 @@ class execute
             "COOKIE"=>$this->cookie(),
             "FILES"=>$this->files()
         ];
+    }
+
+    private function prepareEnv()
+    {
+        $conf = $this->context->getConf();
+        $envFilePath = $conf['start']['dir'].'/.env';
+        if(!file_exists($envFilePath)) return;
+        $envFile = file_get_contents();
+        $envFile = explode(PHP_EOL,$envFile);
+        foreach($envFile as $envLine){
+            if(empty($envLine)) continue;
+            putenv($envLine);
+        }
     }
 
     private function parseUrlQuery($url)
@@ -274,7 +290,7 @@ class execute
         $h=$content[0];
         unset($content[0]);
 
-        $content[1] = implode("\r\n\r\n",$content);
+        $content[1] = implode($content);
         $content[0] = $h;
         if(isset($content[0])){
             $headers = $content[0];
